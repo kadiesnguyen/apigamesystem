@@ -1,0 +1,12 @@
+/* KHÔNG set color/background chung cho span, a, td, th */
+/* Nền tổng thể */
+html, body, #root { height: 100%; background: #0e1526; }
+
+/* Scrollbar gọn */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: #1b2640; border-radius: 6px; }
+
+/* Fix bảng bị bể chữ trắng trên nền trắng do override cũ */
+.ant-table, .ant-card, .ant-form, .ant-input, .ant-select-selector {
+  background: transparent;
+}
