@@ -1,0 +1,1349 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 17.5
+-- Dumped by pg_dump version 17.5
+
+-- Started on 2025-11-05 07:20:39
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 3 (class 3079 OID 16777)
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- TOC entry 5096 (class 0 OID 0)
+-- Dependencies: 3
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+
+
+--
+-- TOC entry 2 (class 3079 OID 16581)
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- TOC entry 5097 (class 0 OID 0)
+-- Dependencies: 2
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
+--
+-- TOC entry 925 (class 1247 OID 16609)
+-- Name: game_category; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.game_category AS ENUM (
+    'slot',
+    'table',
+    'lottery'
+);
+
+
+ALTER TYPE public.game_category OWNER TO postgres;
+
+--
+-- TOC entry 931 (class 1247 OID 16624)
+-- Name: game_status; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.game_status AS ENUM (
+    'active',
+    'inactive',
+    'draft'
+);
+
+
+ALTER TYPE public.game_status OWNER TO postgres;
+
+--
+-- TOC entry 928 (class 1247 OID 16616)
+-- Name: volatility; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.volatility AS ENUM (
+    'low',
+    'medium',
+    'high'
+);
+
+
+ALTER TYPE public.volatility OWNER TO postgres;
+
+--
+-- TOC entry 282 (class 1255 OID 16862)
+-- Name: fn_acc_partner_match(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.fn_acc_partner_match() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE p_partner INT;
+BEGIN
+  SELECT partner_id INTO p_partner FROM players WHERE id = NEW.player_id;
+  IF p_partner IS NULL THEN
+    RAISE EXCEPTION 'Player % not found', NEW.player_id;
+  END IF;
+  IF NEW.partner_id IS DISTINCT FROM p_partner THEN
+    RAISE EXCEPTION 'partner_id mismatch: account.partner_id=%, player.partner_id=%',
+      NEW.partner_id, p_partner;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.fn_acc_partner_match() OWNER TO postgres;
+
+--
+-- TOC entry 245 (class 1255 OID 16669)
+-- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.set_updated_at() OWNER TO postgres;
+
+--
+-- TOC entry 297 (class 1255 OID 16884)
+-- Name: sp_deposit(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_deposit(p_account_id bigint, p_amount numeric, p_ref_id character varying DEFAULT NULL::character varying, p_meta jsonb DEFAULT NULL::jsonb) RETURNS TABLE(balance_after numeric)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_balance NUMERIC;
+BEGIN
+  IF p_amount <= 0 THEN RAISE EXCEPTION 'Amount phải > 0'; END IF;
+
+  UPDATE player_accounts
+  SET balance = balance + p_amount
+  WHERE id = p_account_id
+  RETURNING balance INTO v_balance;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Account % không tồn tại', p_account_id; END IF;
+
+  INSERT INTO account_ledger(account_id, ref_type, ref_id, amount, balance_after, meta)
+  VALUES (p_account_id, 'deposit', p_ref_id, p_amount, v_balance, p_meta);
+
+  balance_after := v_balance; RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_deposit(p_account_id bigint, p_amount numeric, p_ref_id character varying, p_meta jsonb) OWNER TO postgres;
+
+--
+-- TOC entry 295 (class 1255 OID 16882)
+-- Name: sp_ensure_game_account(bigint, integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_ensure_game_account(p_player_id bigint, p_game_id integer, p_username character varying DEFAULT NULL::character varying, p_currency character varying DEFAULT 'VND'::character varying) RETURNS TABLE(account_id bigint)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_partner_id INT;
+BEGIN
+  SELECT partner_id INTO v_partner_id FROM players WHERE id = p_player_id AND active = TRUE;
+  IF v_partner_id IS NULL THEN
+    RAISE EXCEPTION 'Player % không tồn tại hoặc không active', p_player_id;
+  END IF;
+
+  -- Nếu tồn tại → trả về, nếu chưa → tạo mới
+  INSERT INTO player_accounts(player_id, game_id, partner_id, username, currency)
+  VALUES (p_player_id, p_game_id, v_partner_id, COALESCE(p_username, ''), p_currency)
+  ON CONFLICT (game_id, partner_id, username) DO NOTHING;
+
+  SELECT id INTO account_id
+  FROM player_accounts
+  WHERE player_id = p_player_id AND game_id = p_game_id AND partner_id = v_partner_id
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF account_id IS NULL THEN
+    -- fallback: với UNIQUE (game_id, partner_id, username) có thể cần username không rỗng
+    RAISE EXCEPTION 'Không thể tạo/tìm account: cần username cho game_id=% partner_id=%', p_game_id, v_partner_id;
+  END IF;
+
+  RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_ensure_game_account(p_player_id bigint, p_game_id integer, p_username character varying, p_currency character varying) OWNER TO postgres;
+
+--
+-- TOC entry 299 (class 1255 OID 16886)
+-- Name: sp_hold(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_hold(p_account_id bigint, p_stake numeric, p_round_id character varying, p_meta jsonb DEFAULT NULL::jsonb) RETURNS TABLE(balance_after numeric, locked_after numeric)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_balance NUMERIC; v_locked NUMERIC;
+BEGIN
+  IF p_stake <= 0 THEN RAISE EXCEPTION 'Stake phải > 0'; END IF;
+
+  UPDATE player_accounts
+  SET balance = balance - p_stake,
+      locked_balance = locked_balance + p_stake
+  WHERE id = p_account_id AND balance >= p_stake
+  RETURNING balance, locked_balance INTO v_balance, v_locked;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Số dư không đủ để hold'; END IF;
+
+  INSERT INTO account_ledger(account_id, ref_type, ref_id, amount, balance_after, meta)
+  VALUES (p_account_id, 'hold', p_round_id, -p_stake, v_balance, p_meta);
+
+  balance_after := v_balance; locked_after := v_locked; RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_hold(p_account_id bigint, p_stake numeric, p_round_id character varying, p_meta jsonb) OWNER TO postgres;
+
+--
+-- TOC entry 296 (class 1255 OID 16883)
+-- Name: sp_login_player(integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_login_player(p_partner_id integer, p_username character varying, p_password_plain character varying) RETURNS TABLE(player_id bigint, active boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_hash VARCHAR;
+BEGIN
+  SELECT id, password_hash, active
+  INTO player_id, v_hash, active
+  FROM players
+  WHERE partner_id = p_partner_id AND username = p_username;
+
+  IF player_id IS NULL THEN
+    RAISE EXCEPTION 'Sai thông tin đăng nhập' USING ERRCODE = '28P01';
+  END IF;
+
+  IF crypt(p_password_plain, v_hash) <> v_hash THEN
+    RAISE EXCEPTION 'Sai mật khẩu' USING ERRCODE = '28P01';
+  END IF;
+
+  IF active IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION 'Tài khoản bị khóa';
+  END IF;
+
+  RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_login_player(p_partner_id integer, p_username character varying, p_password_plain character varying) OWNER TO postgres;
+
+--
+-- TOC entry 283 (class 1255 OID 16881)
+-- Name: sp_register_player(integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_register_player(p_partner_id integer, p_username character varying, p_password_hash character varying) RETURNS TABLE(player_id bigint)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  INSERT INTO players(partner_id, username, password_hash, active)
+  VALUES (p_partner_id, p_username, p_password_hash, TRUE)
+  RETURNING id INTO player_id;
+  RETURN;
+EXCEPTION WHEN unique_violation THEN
+  RAISE EXCEPTION 'Username "%" đã tồn tại trong partner %', p_username, p_partner_id
+    USING ERRCODE = 'unique_violation';
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_register_player(p_partner_id integer, p_username character varying, p_password_hash character varying) OWNER TO postgres;
+
+--
+-- TOC entry 301 (class 1255 OID 16888)
+-- Name: sp_release_only(bigint, character varying, numeric, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_release_only(p_account_id bigint, p_round_id character varying, p_stake numeric, p_meta jsonb DEFAULT NULL::jsonb) RETURNS TABLE(balance_after numeric, locked_after numeric)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_balance NUMERIC; v_locked NUMERIC;
+BEGIN
+  UPDATE player_accounts
+  SET locked_balance = locked_balance - p_stake,
+      balance = balance + p_stake
+  WHERE id = p_account_id AND locked_balance >= p_stake
+  RETURNING balance, locked_balance INTO v_balance, v_locked;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'locked_balance không đủ để release'; END IF;
+
+  INSERT INTO account_ledger(account_id, ref_type, ref_id, amount, balance_after, meta)
+  VALUES (p_account_id, 'release', p_round_id, 0, v_balance, p_meta);
+
+  balance_after := v_balance; locked_after := v_locked; RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_release_only(p_account_id bigint, p_round_id character varying, p_stake numeric, p_meta jsonb) OWNER TO postgres;
+
+--
+-- TOC entry 300 (class 1255 OID 16887)
+-- Name: sp_settle(bigint, character varying, numeric, numeric, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_settle(p_account_id bigint, p_round_id character varying, p_stake numeric, p_payout numeric, p_meta jsonb DEFAULT NULL::jsonb) RETURNS TABLE(balance_after numeric, locked_after numeric)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_balance NUMERIC; v_locked NUMERIC;
+BEGIN
+  IF p_stake < 0 OR p_payout < 0 THEN RAISE EXCEPTION 'stake/payout phải >= 0'; END IF;
+
+  -- Nhả tiền giữ
+  UPDATE player_accounts
+  SET locked_balance = locked_balance - p_stake
+  WHERE id = p_account_id AND locked_balance >= p_stake
+  RETURNING balance, locked_balance INTO v_balance, v_locked;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'locked_balance không đủ để release'; END IF;
+
+  -- Ghi bet âm + cộng payout dương trên balance
+  UPDATE player_accounts
+  SET balance = balance - p_stake + p_payout
+  WHERE id = p_account_id
+  RETURNING balance, locked_balance INTO v_balance, v_locked;
+
+  -- Ledger: bet và win
+  INSERT INTO account_ledger(account_id, ref_type, ref_id, amount, balance_after, meta)
+  VALUES
+    (p_account_id, 'bet', p_round_id, -p_stake, v_balance - p_payout, p_meta),
+    (p_account_id, 'win', p_round_id,  p_payout, v_balance, p_meta);
+
+  balance_after := v_balance; locked_after := v_locked; RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_settle(p_account_id bigint, p_round_id character varying, p_stake numeric, p_payout numeric, p_meta jsonb) OWNER TO postgres;
+
+--
+-- TOC entry 298 (class 1255 OID 16885)
+-- Name: sp_withdraw(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sp_withdraw(p_account_id bigint, p_amount numeric, p_ref_id character varying DEFAULT NULL::character varying, p_meta jsonb DEFAULT NULL::jsonb) RETURNS TABLE(balance_after numeric)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE v_balance NUMERIC;
+BEGIN
+  IF p_amount <= 0 THEN RAISE EXCEPTION 'Amount phải > 0'; END IF;
+
+  UPDATE player_accounts
+  SET balance = balance - p_amount
+  WHERE id = p_account_id AND balance >= p_amount
+  RETURNING balance INTO v_balance;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'Số dư không đủ'; END IF;
+
+  INSERT INTO account_ledger(account_id, ref_type, ref_id, amount, balance_after, meta)
+  VALUES (p_account_id, 'withdraw', p_ref_id, -p_amount, v_balance, p_meta);
+
+  balance_after := v_balance; RETURN;
+END;
+$$;
+
+
+ALTER FUNCTION public.sp_withdraw(p_account_id bigint, p_amount numeric, p_ref_id character varying, p_meta jsonb) OWNER TO postgres;
+
+--
+-- TOC entry 234 (class 1255 OID 16517)
+-- Name: superace_user_set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.superace_user_set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.superace_user_set_updated_at() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 233 (class 1259 OID 16865)
+-- Name: account_ledger; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.account_ledger (
+    id bigint NOT NULL,
+    account_id bigint NOT NULL,
+    ref_type character varying(16) NOT NULL,
+    ref_id character varying(64),
+    amount numeric(20,2) NOT NULL,
+    balance_after numeric(20,2) NOT NULL,
+    meta jsonb,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.account_ledger OWNER TO postgres;
+
+--
+-- TOC entry 232 (class 1259 OID 16864)
+-- Name: account_ledger_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.account_ledger_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.account_ledger_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5098 (class 0 OID 0)
+-- Dependencies: 232
+-- Name: account_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.account_ledger_id_seq OWNED BY public.account_ledger.id;
+
+
+--
+-- TOC entry 227 (class 1259 OID 16763)
+-- Name: admin_sessions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.admin_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id bigint NOT NULL,
+    refresh_hash text NOT NULL,
+    user_agent text,
+    ip inet,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone
+);
+
+
+ALTER TABLE public.admin_sessions OWNER TO postgres;
+
+--
+-- TOC entry 226 (class 1259 OID 16732)
+-- Name: admin_users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.admin_users (
+    id bigint NOT NULL,
+    username text NOT NULL,
+    display_name text,
+    email text,
+    password_hash text NOT NULL,
+    role text NOT NULL,
+    partner_id bigint,
+    is_active boolean DEFAULT true NOT NULL,
+    timezone text DEFAULT 'GMT+7'::text NOT NULL,
+    language text DEFAULT 'vi'::text NOT NULL,
+    last_login_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_admin_users_partner_consistency CHECK ((((role = 'partner'::text) AND (partner_id IS NOT NULL)) OR ((role = ANY (ARRAY['admin'::text, 'superadmin'::text])) AND (partner_id IS NULL)))),
+    CONSTRAINT chk_admin_users_role CHECK ((role = ANY (ARRAY['superadmin'::text, 'admin'::text, 'partner'::text])))
+);
+
+
+ALTER TABLE public.admin_users OWNER TO postgres;
+
+--
+-- TOC entry 225 (class 1259 OID 16731)
+-- Name: admin_users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.admin_users_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.admin_users_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5099 (class 0 OID 0)
+-- Dependencies: 225
+-- Name: admin_users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.admin_users_id_seq OWNED BY public.admin_users.id;
+
+
+--
+-- TOC entry 223 (class 1259 OID 16672)
+-- Name: games; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.games (
+    id integer NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    category public.game_category NOT NULL,
+    rtp numeric(5,2) NOT NULL,
+    volatility public.volatility NOT NULL,
+    status public.game_status DEFAULT 'draft'::public.game_status NOT NULL,
+    icon_url text,
+    desc_short text,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT games_rtp_check CHECK (((rtp >= (80)::numeric) AND (rtp <= (100)::numeric)))
+);
+
+
+ALTER TABLE public.games OWNER TO postgres;
+
+--
+-- TOC entry 224 (class 1259 OID 16686)
+-- Name: partner_games; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.partner_games (
+    partner_id bigint NOT NULL,
+    game_id integer NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    rtp_override numeric(5,2),
+    sort_order integer DEFAULT 0,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT partner_games_rtp_override_check CHECK (((rtp_override IS NULL) OR ((rtp_override >= (80)::numeric) AND (rtp_override <= (100)::numeric))))
+);
+
+
+ALTER TABLE public.partner_games OWNER TO postgres;
+
+--
+-- TOC entry 220 (class 1259 OID 16419)
+-- Name: partner_sessions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.partner_sessions (
+    id integer NOT NULL,
+    partner_id character varying(100) NOT NULL,
+    token text NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    used boolean DEFAULT false
+);
+
+
+ALTER TABLE public.partner_sessions OWNER TO postgres;
+
+--
+-- TOC entry 219 (class 1259 OID 16418)
+-- Name: partner_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.partner_sessions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.partner_sessions_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5100 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: partner_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.partner_sessions_id_seq OWNED BY public.partner_sessions.id;
+
+
+--
+-- TOC entry 222 (class 1259 OID 16475)
+-- Name: partners; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.partners (
+    id integer NOT NULL,
+    name text NOT NULL,
+    api_key text NOT NULL,
+    secret_key text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    active boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.partners OWNER TO postgres;
+
+--
+-- TOC entry 221 (class 1259 OID 16474)
+-- Name: partners_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.partners_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.partners_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5101 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: partners_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.partners_id_seq OWNED BY public.partners.id;
+
+
+--
+-- TOC entry 231 (class 1259 OID 16831)
+-- Name: player_accounts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.player_accounts (
+    id bigint NOT NULL,
+    player_id bigint NOT NULL,
+    game_id integer NOT NULL,
+    partner_id integer NOT NULL,
+    username character varying(64) NOT NULL,
+    currency character varying(8) DEFAULT 'VND'::character varying NOT NULL,
+    balance numeric(20,2) DEFAULT 0 NOT NULL,
+    locked_balance numeric(20,2) DEFAULT 0 NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    free_spins integer DEFAULT 0
+);
+
+
+ALTER TABLE public.player_accounts OWNER TO postgres;
+
+--
+-- TOC entry 230 (class 1259 OID 16830)
+-- Name: player_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.player_accounts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.player_accounts_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5102 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: player_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.player_accounts_id_seq OWNED BY public.player_accounts.id;
+
+
+--
+-- TOC entry 229 (class 1259 OID 16815)
+-- Name: players; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.players (
+    id bigint NOT NULL,
+    partner_id integer NOT NULL,
+    username character varying(64) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.players OWNER TO postgres;
+
+--
+-- TOC entry 228 (class 1259 OID 16814)
+-- Name: players_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.players_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.players_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5103 (class 0 OID 0)
+-- Dependencies: 228
+-- Name: players_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.players_id_seq OWNED BY public.players.id;
+
+
+--
+-- TOC entry 4879 (class 2604 OID 16868)
+-- Name: account_ledger id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.account_ledger ALTER COLUMN id SET DEFAULT nextval('public.account_ledger_id_seq'::regclass);
+
+
+--
+-- TOC entry 4861 (class 2604 OID 16735)
+-- Name: admin_users id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.admin_users ALTER COLUMN id SET DEFAULT nextval('public.admin_users_id_seq'::regclass);
+
+
+--
+-- TOC entry 4847 (class 2604 OID 16422)
+-- Name: partner_sessions id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partner_sessions ALTER COLUMN id SET DEFAULT nextval('public.partner_sessions_id_seq'::regclass);
+
+
+--
+-- TOC entry 4850 (class 2604 OID 16478)
+-- Name: partners id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partners ALTER COLUMN id SET DEFAULT nextval('public.partners_id_seq'::regclass);
+
+
+--
+-- TOC entry 4872 (class 2604 OID 16834)
+-- Name: player_accounts id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts ALTER COLUMN id SET DEFAULT nextval('public.player_accounts_id_seq'::regclass);
+
+
+--
+-- TOC entry 4869 (class 2604 OID 16818)
+-- Name: players id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.players ALTER COLUMN id SET DEFAULT nextval('public.players_id_seq'::regclass);
+
+
+--
+-- TOC entry 5090 (class 0 OID 16865)
+-- Dependencies: 233
+-- Data for Name: account_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.account_ledger (id, account_id, ref_type, ref_id, amount, balance_after, meta, created_at) FROM stdin;
+1	3	deposit	cms-dep:51:1755378634592	50.00	50.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:10:34.619036+07
+2	3	deposit	cms-dep:51:1755378639327	50.00	100.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:10:39.331798+07
+3	3	deposit	cms-dep:51:1755378641389	50.00	150.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:10:41.393875+07
+4	3	deposit	cms-dep:51:1755378645941	50.00	200.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:10:45.944603+07
+5	3	deposit	cms-dep:51:1755378851565	60.00	260.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:14:11.589784+07
+6	3	withdraw	cms-wd:51:1755378870835	-10.00	250.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 04:14:30.86437+07
+7	3	deposit	1	50.00	300.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:15:31.711635+07
+8	3	deposit	cms-dep:51:1755379055997	1.00	301.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:17:36.004148+07
+9	3	deposit	cms-dep:51:1755379159339	11.00	312.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:19:19.35202+07
+10	3	deposit	cms-dep:51:1755379253070	1.00	313.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:20:53.09599+07
+11	3	deposit	cms-dep:51:1755379850288	1.00	314.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:30:50.297006+07
+12	3	deposit	cms-dep:51:1755379872681	1.00	315.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:31:12.718187+07
+13	3	deposit	cms-dep:51:1755379879765	1.00	316.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:31:19.772296+07
+14	3	deposit	cms-dep:51:1755379925070	1.00	317.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:32:05.107863+07
+15	3	deposit	cms-dep:51:1755379932692	1.00	318.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:32:12.702447+07
+16	3	deposit	cms-dep:51:1755380022368	1.00	319.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:33:42.3766+07
+17	3	deposit	cms-dep:51:1755380099011	1.00	320.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:34:59.046324+07
+18	3	withdraw	cms-wd:51:1755380124951	-1.00	319.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 04:35:24.987872+07
+19	3	deposit	cms-dep:51:1755380130401	1.00	320.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:35:30.410548+07
+20	3	deposit	cms-dep:51:1755380137862	1.00	321.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:35:37.867201+07
+21	3	deposit	cms-dep:51:1755380268653	1.00	322.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:37:48.661412+07
+22	3	deposit	cms-dep:51:1755380272785	11.00	333.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:37:52.793827+07
+23	3	deposit	cms-dep:51:1755380331472	1.00	334.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:38:51.476567+07
+24	3	deposit	cms-dep:51:1755380356466	1.00	335.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:39:16.475203+07
+25	3	deposit	cms-dep:51:1755380375843	1.00	336.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:39:35.854202+07
+26	3	deposit	cms-dep:51:1755381147762	1.00	337.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:52:27.769832+07
+27	3	deposit	cms-dep:51:1755381154289	2.00	339.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:52:34.298832+07
+28	3	deposit	cms-dep:51:1755381316784	1.00	340.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:55:16.793464+07
+29	3	deposit	cms-dep:51:1755381341590	1.00	341.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:55:41.598374+07
+30	3	deposit	cms-dep:51:1755381347934	1.00	342.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:55:47.946899+07
+31	3	deposit	cms-dep:51:1755381365986	1.00	343.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:56:05.992019+07
+32	3	deposit	cms-dep:51:1755381383022	2.00	345.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:56:23.030724+07
+33	3	deposit	cms-dep:51:1755381425083	5.00	350.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:57:05.109322+07
+34	3	deposit	cms-dep:51:1755381508617	1.00	351.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:58:28.627789+07
+35	3	deposit	cms-dep:51:1755381555692	1.00	352.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:59:15.699626+07
+36	3	deposit	cms-dep:51:1755381559876	1.00	353.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:59:19.883091+07
+37	3	deposit	cms-dep:51:1755381579160	1.00	354.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:59:39.166264+07
+38	3	deposit	cms-dep:51:1755381587554	1.00	355.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 04:59:47.563008+07
+39	3	deposit	cms-dep:51:1755381656100	1.00	356.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:00:56.107518+07
+40	3	withdraw	cms-wd:51:1755381663476	-2.00	354.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:01:03.484221+07
+41	3	deposit	cms-dep:51:1755381811383	1.00	355.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:03:31.391802+07
+42	3	deposit	cms-dep:51:1755381816060	1.00	356.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:03:36.066136+07
+43	3	deposit	cms-dep:51:1755381889622	1.00	357.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:04:49.630673+07
+44	3	deposit	cms-dep:51:1755381893608	1.00	358.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:04:53.617015+07
+45	3	deposit	cms-dep:51:1755381898919	5.00	363.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:04:58.928391+07
+46	3	deposit	cms-dep:51:1755381917907	1.00	364.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:17.916974+07
+47	3	deposit	cms-dep:51:1755381924273	1.00	365.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:24.282078+07
+48	3	deposit	cms-dep:51:1755381935345	1.00	366.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:35.350131+07
+49	3	deposit	cms-dep:51:1755381941065	1.00	367.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:41.069444+07
+50	3	deposit	cms-dep:51:1755381947768	1.00	368.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:47.772802+07
+51	3	deposit	cms-dep:51:1755381956519	1.00	369.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:05:56.529358+07
+52	3	deposit	cms-dep:51:1755381963893	1.00	370.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:06:03.898519+07
+53	3	deposit	cms-dep:51:1755381970106	1.00	371.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:06:10.116706+07
+54	3	withdraw	cms-wd:51:1755382069486	-1.00	370.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:07:49.49085+07
+55	3	withdraw	cms-wd:51:1755382090257	-1.00	369.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:08:10.26261+07
+56	3	withdraw	cms-wd:51:1755382093321	-4.00	365.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:08:13.326916+07
+57	3	deposit	cms-dep:51:1755382096023	5.00	370.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:08:16.030565+07
+58	3	deposit	cms-dep:51:1755382104205	1.00	371.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:08:24.210594+07
+59	3	deposit	cms-dep:51:1755382115192	1.00	372.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:08:35.197222+07
+60	3	withdraw	cms-wd:51:1755382241130	-1.00	371.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:10:41.135711+07
+61	3	deposit	cms-dep:51:1755382276241	1.00	372.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:11:16.247986+07
+62	3	withdraw	cms-wd:51:1755382279582	-5.00	367.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:11:19.590218+07
+63	3	withdraw	cms-wd:51:1755382283219	-111.00	256.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:11:23.222813+07
+64	3	deposit	cms-dep:51:1755382732114	50.00	306.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:18:52.137972+07
+65	3	deposit	cms-dep:51:1755382917677	1.00	307.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:21:57.688058+07
+66	3	deposit	cms-dep:51:1755382984460	1.00	308.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:23:04.472313+07
+67	3	withdraw	cms-wd:51:1755382991445	-2.00	306.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:23:11.450156+07
+68	3	deposit	cms-dep:51:1755383070677	1.00	307.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:24:30.715759+07
+69	3	deposit	cms-dep:51:1755383076857	1.00	308.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:24:36.862736+07
+70	3	withdraw	cms-wd:51:1755383087608	-1.00	307.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:24:47.615257+07
+71	3	deposit	cms-dep:51:1755383124415	1.00	308.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 05:25:24.426762+07
+72	3	withdraw	cms-wd:51:1755383768904	-308.00	0.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 05:36:08.913042+07
+73	3	deposit	cms-dep:51:1755385975590	500.00	500.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 06:12:55.605766+07
+74	3	withdraw	cms-wd:51:1755386002753	-1.00	481.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 06:13:22.788574+07
+75	3	withdraw	cms-wd:51:1755386020672	-1.00	480.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 06:13:40.697708+07
+76	3	deposit	cms-dep:51:1755386027249	11.00	491.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 06:13:47.253784+07
+77	3	deposit	cms-dep:51:1755416019137	1.00	501.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 14:33:39.150095+07
+78	3	deposit	cms-dep:51:1755416023769	55.00	556.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 14:33:43.776476+07
+79	3	withdraw	cms-wd:51:1755416477519	-111.00	445.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 14:41:17.529916+07
+80	3	withdraw	cms-wd:51:1755416483919	-111.00	334.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 14:41:23.928524+07
+\.
+
+
+--
+-- TOC entry 5084 (class 0 OID 16763)
+-- Dependencies: 227
+-- Data for Name: admin_sessions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.admin_sessions (id, user_id, refresh_hash, user_agent, ip, created_at, expires_at, revoked_at) FROM stdin;
+f18049b7-4dac-4031-9421-0ff59026a2bf	1	f82baeadf3d586a15d0f345af87af03fbbdd4f2690e100d01d00725a7173d318	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 01:15:29.1195+07	2025-09-16 01:15:29.1195+07	2025-08-17 02:52:02.640251+07
+c6f4f036-3a5f-4010-b252-3b57d86f4bef	1	53926762a515799a978840d3fb410844c42577955bbb491b08a124d4ba3c8a46	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 02:52:02.641714+07	2025-08-24 02:52:02.641714+07	\N
+1bf0608d-cce9-444d-814a-4c4e9b5e7fda	1	9248682f8cc7d438014891d75eec68d0366fb9944d488d848d48f7101d09f091	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 02:55:13.158567+07	2025-09-16 02:55:13.158567+07	\N
+3ea10810-fee1-456c-b2f5-7a807d2c41d4	1	bba9a03ebb4dff00a94b8509ad2504256689b6be87a4cd15d8b90d5ed8ccb091	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 03:16:22.53877+07	2025-09-16 03:16:22.53877+07	\N
+f0058cfe-75a1-4ac3-9605-804970174dda	1	e1083dc50163816b823558069c35b6f9723fd87591232476b5f49feac32de354	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 03:32:28.590737+07	2025-09-16 03:32:28.590737+07	2025-08-17 04:33:02.337123+07
+38002dfc-b329-4e55-9130-3a42cb2dcc8d	1	f63d78f171e4c8ba35c5e6b74bc133b77ce057bfe5f8411a7d0055e728e8160b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 04:33:02.339112+07	2025-08-24 04:33:02.339112+07	\N
+a3221e19-e230-4601-bf48-56b80ff0de88	1	becf276b70a61da7873d5ecdf13d17ddd183f13eefa8f21b79c4d0e01e6f455e	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 04:33:33.277362+07	2025-09-16 04:33:33.277362+07	2025-08-17 05:34:05.374724+07
+ee3ccc1f-22a1-4dd7-916d-5fab34a6058d	1	b585fc15d3985da5440075f66c545a797866e11c46656cd4df8073af17c67df6	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 05:34:05.376716+07	2025-08-24 05:34:05.376716+07	\N
+1c1bdd4b-7ad9-463c-8d1f-d3322e77b8b5	1	05042572729e4db81917da86f9a52e61f020feceee0d13b92ea27da66877c530	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 05:34:05.37632+07	2025-08-24 05:34:05.37632+07	\N
+41ceae05-46bd-4177-b4b8-bf4d538b8206	1	9da937c7f6aa27ace235978e9b97bea711a07a9518c4217e8b0ef74ce4487cc8	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 05:34:19.343849+07	2025-09-16 05:34:19.343849+07	2025-08-17 06:34:22.997616+07
+45053257-7091-4ebd-82e6-c9bb94363a01	1	3347ea8728a528f19a68628116066e6940179deeb842986b19acb97d0adf5fd3	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 06:34:22.998961+07	2025-08-24 06:34:22.998961+07	\N
+a97e0639-da1c-4cea-9adb-e369daaaf8d4	1	e913e5be4339f0a4fcc9451010f5188c20ceea08f0e09887e606ed0dd9100063	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 06:34:22.999055+07	2025-08-24 06:34:22.999055+07	\N
+a5314547-b1cc-4d57-b095-03c9f0117d68	1	bebb4a5925d291f13d8b2e88e53343c37904bbe3f22067bd77ffb680242c9489	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 06:34:50.137394+07	2025-09-16 06:34:50.137394+07	\N
+62707454-d95a-4219-afed-78e54f8dcc47	1	54f784a97d00334f9d1cdc93e1570ce60d0f25d96f56d4308f97ff5a616a9bd4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 13:51:48.554472+07	2025-09-16 13:51:48.554472+07	2025-08-17 16:26:05.645905+07
+419c5f10-c6a1-4746-9646-094ce31aa6e3	1	8ece093effc3b2f0850d93c45de5a24597febea7e7c44e3cd6c9cf4fba1feba4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 16:26:05.648858+07	2025-08-24 16:26:05.648858+07	\N
+eff0d39c-ee27-43e9-a80a-9a654ee3be01	1	b27e3c902ccdca7978f584635046c3306e5ae70fad000e8f5a6d953574e83862	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 22:54:21.324054+07	2025-09-16 22:54:21.324054+07	2025-08-18 00:45:14.449076+07
+3a89815e-dbef-40e7-b7b8-7aff10c59752	1	3f47d1ce0805695ba30dc2adf8c80e0823da66aec0b84ae630a48add9402a71b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-18 00:45:14.450397+07	2025-08-25 00:45:14.450397+07	\N
+74dc1161-3424-4f1c-bd4e-4683f4fcc5b7	1	3c0ed2f9048b5ad8b63218bdf78f8b96e25d5b2dea17d854ae6f59cc1d2292b2	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-18 00:45:25.553173+07	2025-09-17 00:45:25.553173+07	\N
+\.
+
+
+--
+-- TOC entry 5083 (class 0 OID 16732)
+-- Dependencies: 226
+-- Data for Name: admin_users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.admin_users (id, username, display_name, email, password_hash, role, partner_id, is_active, timezone, language, last_login_at, created_at, updated_at) FROM stdin;
+1	admin	Super Administrator	admin@example.com	$2a$10$mlg39cP5lMuJ.jbrECNPZeZV6IYok.Mf2kFUPCW.lA/Y8Y1AIqqOW	superadmin	\N	t	GMT+7	vi	2025-08-18 00:45:25.556949+07	2025-08-17 01:02:29.053211+07	2025-08-18 00:45:25.556949+07
+\.
+
+
+--
+-- TOC entry 5080 (class 0 OID 16672)
+-- Dependencies: 223
+-- Data for Name: games; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.games (id, code, name, category, rtp, volatility, status, icon_url, desc_short, config, created_at, updated_at) FROM stdin;
+1001	superace	Super Ace	slot	80.20	high	active	\N	\N	{"noWinRate": 0.259, "payoutTable": [[0, 0, 0, 0.2, 0.6, 1], [0, 0, 0, 0.3, 0.9, 1.5], [0, 0, 0, 0.4, 1.2, 2], [0, 0, 0, 0.5, 1.5, 2.5], [0, 0, 0, 0.1, 0.3, 0.5], [0, 0, 0, 0.05, 0.15, 0.25], [0, 0, 0, 0.05, 0.15, 0.25], [0, 0, 0, 0.1, 0.3, 0.5]], "goldenChance": 0.373, "redWildChance": 0.03, "scatterChance": 0.02}	2025-08-15 16:18:46.956443+07	2025-08-18 01:11:20.992706+07
+\.
+
+
+--
+-- TOC entry 5081 (class 0 OID 16686)
+-- Dependencies: 224
+-- Data for Name: partner_games; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.partner_games (partner_id, game_id, enabled, rtp_override, sort_order, config, updated_at) FROM stdin;
+1	1001	t	96.50	0	{"bet": {"max": 200, "min": 0.2}}	2025-08-15 16:18:46.956443+07
+\.
+
+
+--
+-- TOC entry 5077 (class 0 OID 16419)
+-- Dependencies: 220
+-- Data for Name: partner_sessions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.partner_sessions (id, partner_id, token, expires_at, created_at, used) FROM stdin;
+1	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzNjk2NiwiZXhwIjoxNzUzMDQ0MTY2fQ.b_FeHBXyN5IU0-KZOIJiUqncstVXamlaGl3bOi4eFu8	2025-07-21 03:42:46.022	2025-07-21 01:42:46.023343	f
+2	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzODYyNiwiZXhwIjoxNzUzMDQ1ODI2fQ.5Buwgj0dB8ftHH0rBWSIpnoNyzRPsmp9oVYDc6Tw82c	2025-07-21 04:10:26.494	2025-07-21 02:10:26.494663	f
+3	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzOTE1MCwiZXhwIjoxNzUzMDQ2MzUwfQ.wsPt9iuHx_CeSVXrcXIxFLq2N-F1ripOoEq8DPc7QqE	2025-07-21 04:19:10.961	2025-07-21 02:19:10.96258	f
+4	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzOTE1MywiZXhwIjoxNzUzMDQ2MzUzfQ.JNpysJHufwfec00QjQHNO8qi7lmhrp7yHvzMF_DIBJU	2025-07-21 04:19:13.36	2025-07-21 02:19:13.360705	f
+5	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzOTI3MywiZXhwIjoxNzUzMDQ2NDczfQ.VSKNt93q1KY2rF9Z4gqGsxeV6Qovi3TEjF3sPm66Sy0	2025-07-21 04:21:13.892	2025-07-21 02:21:13.893515	f
+6	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzAzOTM2OCwiZXhwIjoxNzUzMDQ2NTY4fQ.zmJou6S1yqyiOx6Hl0z-KnjhKF2bFUIoH_crfW7251U	2025-07-21 04:22:48.617	2025-07-21 02:22:48.617875	f
+7	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDE2MywiZXhwIjoxNzUzMDUxMzYzfQ.PELgswNTJggnnv78PAl1DjlwoK8nIU7fR6DUDQB2aY4	2025-07-21 05:42:43.773	2025-07-21 03:42:43.774318	f
+8	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDQwMCwiZXhwIjoxNzUzMDUxNjAwfQ.27oje--ma39UyvslBtwyz07oM6gN5v70YGHhrv0wL5k	2025-07-21 05:46:40.998	2025-07-21 03:46:40.998549	f
+9	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDgzMiwiZXhwIjoxNzUzMDUyMDMyfQ.51bhzlOE8A_WeaFhnLy4Cc9LImGBDvhnR3rQb1bd6PQ	2025-07-21 05:53:52.147	2025-07-21 03:53:52.148049	f
+10	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDgzNiwiZXhwIjoxNzUzMDUyMDM2fQ.UwsDqsLFj_AJfFgJ2EZJWV4TbPu6_jcfGdHkEX9K8mY	2025-07-21 05:53:56.878	2025-07-21 03:53:56.878948	f
+11	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDkwOCwiZXhwIjoxNzUzMDUyMTA4fQ.G4qR3OXZlyZckr-Z3Dc1-61O8Rb0Ml1r0-3fqQGJYwo	2025-07-21 05:55:08.198	2025-07-21 03:55:08.199889	f
+12	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDk1NiwiZXhwIjoxNzUzMDUyMTU2fQ.oAre_hh2_9aGzUjdhMqZC8OE7vvclem8UVjQ6MaE_OY	2025-07-21 05:55:56.12	2025-07-21 03:55:56.122962	f
+13	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDk4MCwiZXhwIjoxNzUzMDUyMTgwfQ.fgNqJwzeRK5g-gx05qLq32fuWZ6111sJNsx504Ou0pM	2025-07-21 05:56:20.765	2025-07-21 03:56:20.766773	f
+14	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDk4MywiZXhwIjoxNzUzMDUyMTgzfQ._DhJ3Y56E-im-Dgj80uRSahlM0azTxO9C5efK4dX_Uc	2025-07-21 05:56:23.422	2025-07-21 03:56:23.422885	f
+15	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NDk5OCwiZXhwIjoxNzUzMDUyMTk4fQ.Z-b-lHfoltJARqLpDFrmf6lYzRDnJTFjRtU8XRKXi4k	2025-07-21 05:56:38.053	2025-07-21 03:56:38.055887	f
+16	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTA0MywiZXhwIjoxNzUzMDUyMjQzfQ.kQ05f_TuDl6C6ruDQe32afHIWKkeW8Pm16NXZNCk-b0	2025-07-21 05:57:23.051	2025-07-21 03:57:23.0516	f
+17	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTA3MiwiZXhwIjoxNzUzMDUyMjcyfQ.DE1_rwxOfgT5EPvcS4Q4I50jxUXostyzS0anx7Tv-hU	2025-07-21 05:57:52.794	2025-07-21 03:57:52.79478	f
+18	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTU3OCwiZXhwIjoxNzUzMDUyNzc4fQ.0jcU_qDcJxLhONpnxTUNp-K8Y0QA0cFAx5LSdqH3k8I	2025-07-21 06:06:18.034	2025-07-21 04:06:18.035232	f
+19	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTU4MiwiZXhwIjoxNzUzMDUyNzgyfQ._LFbAdLLejuCHQdp5d7EfM46qlN30w6dDKNXbDbZA1o	2025-07-21 06:06:22.114	2025-07-21 04:06:22.114933	f
+20	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTU4MiwiZXhwIjoxNzUzMDUyNzgyfQ._LFbAdLLejuCHQdp5d7EfM46qlN30w6dDKNXbDbZA1o	2025-07-21 06:06:22.827	2025-07-21 04:06:22.82807	f
+21	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTc5MCwiZXhwIjoxNzUzMDUyOTkwfQ.-ECL7nHOG7vsPYEqmc4CQ-RmzwXyh9df4I8hMsOetSk	2025-07-21 06:09:50.911	2025-07-21 04:09:50.912548	f
+22	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NTc5MSwiZXhwIjoxNzUzMDUyOTkxfQ.hi31h3IP_2qG6J4i3jWpkvZj41FZaEacTW_YF2X_Tlg	2025-07-21 06:09:51.838	2025-07-21 04:09:51.838826	f
+23	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NjA5NCwiZXhwIjoxNzUzMDUzMjk0fQ.Gl5OCkDP_PFpkefulb354AOzxBCxeFjt_fdotFr0HOA	2025-07-21 06:14:54.799	2025-07-21 04:14:54.799758	f
+24	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0NjgyMiwiZXhwIjoxNzUzMDU0MDIyfQ.AeyytQATxsUS7MYOYL04srnw8H_fDU0MCtjTV8EoK2M	2025-07-21 06:27:02.784	2025-07-21 04:27:02.784643	f
+25	partner_abc	eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXJ0bmVySWQiOiJwYXJ0bmVyX2FiYyIsImlhdCI6MTc1MzA0Nzg0MSwiZXhwIjoxNzUzMDU1MDQxfQ.52NUhalNndbDsYsEGtLiLD7OzesUawjHcDjSmOhRcyg	2025-07-21 06:44:01.24	2025-07-21 04:44:01.240728	f
+\.
+
+
+--
+-- TOC entry 5079 (class 0 OID 16475)
+-- Dependencies: 222
+-- Data for Name: partners; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.partners (id, name, api_key, secret_key, created_at, active) FROM stdin;
+1	Partner ABC	partner_abc	74286262f408	2025-07-24 17:54:52.077589	t
+2	Partner Test	partner_test	test_secret_2025	2025-08-17 02:02:48.08103	t
+\.
+
+
+--
+-- TOC entry 5088 (class 0 OID 16831)
+-- Dependencies: 231
+-- Data for Name: player_accounts; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.player_accounts (id, player_id, game_id, partner_id, username, currency, balance, locked_balance, active, created_at, free_spins) FROM stdin;
+3	51	1001	1	testuser1	VND	691.60	0.00	t	2025-08-17 02:39:23.612699+07	0
+\.
+
+
+--
+-- TOC entry 5086 (class 0 OID 16815)
+-- Dependencies: 229
+-- Data for Name: players; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.players (id, partner_id, username, password_hash, active, created_at) FROM stdin;
+51	1	testuser1	$2b$10$n3ni4ng1j/mQyFYwoAhGiO1DPXJPhuwIfbAdjTGxieNvBnTNJ/afO	t	2025-08-17 02:39:23.612699+07
+\.
+
+
+--
+-- TOC entry 5104 (class 0 OID 0)
+-- Dependencies: 232
+-- Name: account_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.account_ledger_id_seq', 80, true);
+
+
+--
+-- TOC entry 5105 (class 0 OID 0)
+-- Dependencies: 225
+-- Name: admin_users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.admin_users_id_seq', 1, true);
+
+
+--
+-- TOC entry 5106 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: partner_sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.partner_sessions_id_seq', 25, true);
+
+
+--
+-- TOC entry 5107 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: partners_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.partners_id_seq', 2, true);
+
+
+--
+-- TOC entry 5108 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: player_accounts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.player_accounts_id_seq', 3, true);
+
+
+--
+-- TOC entry 5109 (class 0 OID 0)
+-- Dependencies: 228
+-- Name: players_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.players_id_seq', 51, true);
+
+
+--
+-- TOC entry 4917 (class 2606 OID 16873)
+-- Name: account_ledger account_ledger_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.account_ledger
+    ADD CONSTRAINT account_ledger_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4901 (class 2606 OID 16746)
+-- Name: admin_users admin_users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT admin_users_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4903 (class 2606 OID 16748)
+-- Name: admin_users admin_users_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT admin_users_username_key UNIQUE (username);
+
+
+--
+-- TOC entry 4893 (class 2606 OID 16685)
+-- Name: games games_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.games
+    ADD CONSTRAINT games_code_key UNIQUE (code);
+
+
+--
+-- TOC entry 4895 (class 2606 OID 16683)
+-- Name: games games_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.games
+    ADD CONSTRAINT games_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4899 (class 2606 OID 16697)
+-- Name: partner_games partner_games_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partner_games
+    ADD CONSTRAINT partner_games_pkey PRIMARY KEY (partner_id, game_id);
+
+
+--
+-- TOC entry 4887 (class 2606 OID 16427)
+-- Name: partner_sessions partner_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partner_sessions
+    ADD CONSTRAINT partner_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4889 (class 2606 OID 16485)
+-- Name: partners partners_api_key_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partners
+    ADD CONSTRAINT partners_api_key_key UNIQUE (api_key);
+
+
+--
+-- TOC entry 4891 (class 2606 OID 16483)
+-- Name: partners partners_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partners
+    ADD CONSTRAINT partners_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4913 (class 2606 OID 16843)
+-- Name: player_accounts player_accounts_game_id_partner_id_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts
+    ADD CONSTRAINT player_accounts_game_id_partner_id_username_key UNIQUE (game_id, partner_id, username);
+
+
+--
+-- TOC entry 4915 (class 2606 OID 16841)
+-- Name: player_accounts player_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts
+    ADD CONSTRAINT player_accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4906 (class 2606 OID 16824)
+-- Name: players players_partner_id_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.players
+    ADD CONSTRAINT players_partner_id_username_key UNIQUE (partner_id, username);
+
+
+--
+-- TOC entry 4908 (class 2606 OID 16822)
+-- Name: players players_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.players
+    ADD CONSTRAINT players_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4904 (class 1259 OID 16754)
+-- Name: idx_admin_users_partner_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_admin_users_partner_id ON public.admin_users USING btree (partner_id);
+
+
+--
+-- TOC entry 4896 (class 1259 OID 16708)
+-- Name: idx_games_config_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_games_config_gin ON public.games USING gin (config);
+
+
+--
+-- TOC entry 4897 (class 1259 OID 16709)
+-- Name: idx_partner_games_config_gin; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_partner_games_config_gin ON public.partner_games USING gin (config);
+
+
+--
+-- TOC entry 4885 (class 1259 OID 16433)
+-- Name: idx_partner_token; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_partner_token ON public.partner_sessions USING btree (partner_id, token);
+
+
+--
+-- TOC entry 4909 (class 1259 OID 16861)
+-- Name: ix_acc_game; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_acc_game ON public.player_accounts USING btree (game_id);
+
+
+--
+-- TOC entry 4910 (class 1259 OID 16860)
+-- Name: ix_acc_partner; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_acc_partner ON public.player_accounts USING btree (partner_id);
+
+
+--
+-- TOC entry 4911 (class 1259 OID 16859)
+-- Name: ix_acc_player; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_acc_player ON public.player_accounts USING btree (player_id);
+
+
+--
+-- TOC entry 4918 (class 1259 OID 16879)
+-- Name: ix_ledger_acc_time; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_ledger_acc_time ON public.account_ledger USING btree (account_id, created_at DESC);
+
+
+--
+-- TOC entry 4919 (class 1259 OID 16880)
+-- Name: ix_ledger_ref; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_ledger_ref ON public.account_ledger USING btree (ref_type, ref_id);
+
+
+--
+-- TOC entry 4930 (class 2620 OID 16863)
+-- Name: player_accounts trg_acc_partner_match; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_acc_partner_match BEFORE INSERT OR UPDATE ON public.player_accounts FOR EACH ROW EXECUTE FUNCTION public.fn_acc_partner_match();
+
+
+--
+-- TOC entry 4929 (class 2620 OID 16776)
+-- Name: admin_users trg_admin_users_set_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_admin_users_set_updated_at BEFORE UPDATE ON public.admin_users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- TOC entry 4928 (class 2606 OID 16874)
+-- Name: account_ledger account_ledger_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.account_ledger
+    ADD CONSTRAINT account_ledger_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.player_accounts(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4922 (class 2606 OID 16749)
+-- Name: admin_users admin_users_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT admin_users_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE SET NULL;
+
+
+--
+-- TOC entry 4923 (class 2606 OID 16770)
+-- Name: admin_users fk_admin_users_partner_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT fk_admin_users_partner_id FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE SET NULL;
+
+
+--
+-- TOC entry 4920 (class 2606 OID 16703)
+-- Name: partner_games partner_games_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partner_games
+    ADD CONSTRAINT partner_games_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4921 (class 2606 OID 16698)
+-- Name: partner_games partner_games_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.partner_games
+    ADD CONSTRAINT partner_games_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4925 (class 2606 OID 16849)
+-- Name: player_accounts player_accounts_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts
+    ADD CONSTRAINT player_accounts_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4926 (class 2606 OID 16854)
+-- Name: player_accounts player_accounts_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts
+    ADD CONSTRAINT player_accounts_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4927 (class 2606 OID 16844)
+-- Name: player_accounts player_accounts_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.player_accounts
+    ADD CONSTRAINT player_accounts_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4924 (class 2606 OID 16825)
+-- Name: players players_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.players
+    ADD CONSTRAINT players_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE CASCADE;
+
+
+-- Completed on 2025-11-05 07:20:39
+
+--
+-- PostgreSQL database dump complete
+--
+

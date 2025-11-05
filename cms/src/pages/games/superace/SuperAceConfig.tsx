@@ -6,11 +6,12 @@ import {
   Button,
   Alert,
   Collapse,
+  Form,
   Typography,
   message,
 } from "antd";
 import PercentInput from "@/components/PercentInput";
-import PayoutTableEditor, { type PayoutTable } from "@/components/PayoutTableEditor";
+import PayoutTableEditor, { PayoutTable } from "@/components/PayoutTableEditor";
 import {
   fetchGameConfig,
   updateGameConfig,
@@ -47,7 +48,7 @@ export default function SuperAceConfig({
   partnerId?: number;
 }) {
   const [loading, setLoading] = useState(false);
-  const [noWinRate, setNoWinRate] = useState<number>(3); // %
+  const [noWinRate, setNoWinRate] = useState<number>(20); // %
   const [goldenChance, setGoldenChance] = useState<number>(3); // %
   const [redWildChance, setRedWildChance] = useState<number>(3); // %
   const [scatterChance, setScatterChance] = useState<number>(2); // %
@@ -84,18 +85,14 @@ export default function SuperAceConfig({
   const checks = useMemo(() => {
     const errs: string[] = [];
     const to01 = (v: number) => v / 100;
-    const probs: [string, number][] = [
+    const probs = [
       ["noWinRate", noWinRate],
       ["goldenChance", goldenChance],
       ["redWildChance", redWildChance],
       ["scatterChance", scatterChance],
     ];
     probs.forEach(([k, v]) => {
-      if (k === 'goldenChance' || k === 'redWildChance' || k === 'scatterChance') {
-        if (v < 1 || v > 100) errs.push(`${k} phải trong [1, 100]%`);
-      } else {
-        if (v < 1 || v > 5) errs.push(`${k} phải trong [1, 5]%`);
-      }
+      if (v < 0 || v > 100) errs.push(`${k} phải trong [0, 100]%`);
     });
     // kiểm tra payout: không âm, tăng dần theo số trúng
     payout.forEach((row, i) => {
@@ -146,41 +143,33 @@ export default function SuperAceConfig({
             <Text strong>No Win Rate</Text>
             <PercentInput
               value={noWinRate}
-              onChange={(v) => setNoWinRate(v ?? 1)}
+              onChange={setNoWinRate}
               step={0.1}
-              min={1}
-              max={5}
-              hint="Xác suất quay ra không có line thắng (1–5%)"
+              hint="Xác suất quay ra không có line thắng (0–100%)"
             />
           </div>
           <div>
             <Text strong>Golden Chance</Text>
             <PercentInput
               value={goldenChance}
-              onChange={(v) => setGoldenChance(v ?? 1)}
-              min={1}
-              max={100}
-              hint="Tỉ lệ sinh biểu tượng vàng (1–100%)"
+              onChange={setGoldenChance}
+              hint="Tỉ lệ sinh biểu tượng vàng"
             />
           </div>
           <div>
             <Text strong>Red Wild Chance</Text>
             <PercentInput
               value={redWildChance}
-              onChange={(v) => setRedWildChance(v ?? 1)}
-              min={1}
-              max={100}
-              hint="Tỉ lệ xuất hiện Wild đỏ (1–100%)"
+              onChange={setRedWildChance}
+              hint="Tỉ lệ xuất hiện Wild đỏ"
             />
           </div>
           <div>
             <Text strong>Scatter Chance</Text>
             <PercentInput
               value={scatterChance}
-              onChange={(v) => setScatterChance(v ?? 1)}
-              min={1}
-              max={100}
-              hint="Tỉ lệ ra Scatter (1–100%)"
+              onChange={setScatterChance}
+              hint="Tỉ lệ ra Scatter"
             />
           </div>
           <div style={{ opacity: 0.7 }}>
@@ -189,7 +178,7 @@ export default function SuperAceConfig({
           <div style={{ opacity: 0.7 }}>
             Lưu ý: Các tỉ lệ (Golden Chance, Red Wild Chance, Scatter Chance) là
             xác suất xuất hiện trên <b>một ô biểu tượng</b> trong lưới quay
-            (1–100%). Nghĩa là với lưới có 20 ô, giá trị 3% tương đương xác suất
+            (0–100%). Nghĩa là với lưới có 20 ô, giá trị 3% tương đương xác suất
             trung bình khoảng <b>60% để xuất hiện ít nhất một biểu tượng đó</b>{" "}
             trong một lượt quay.
           </div>

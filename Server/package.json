@@ -1,0 +1,30 @@
+{
+  "name": "serverslot",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run dist/index.js",
+    "stop_dev": "./stop_dev.sh"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.3.3",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.0",
+    "elysia": "^1.3.5",
+    "ioredis": "^5.6.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.17.0",
+    "pg": "^8.16.3",
+    "ws": "^8.18.3",
+    "y": "^0.3.2"
+  }
+}

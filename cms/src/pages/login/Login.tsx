@@ -24,8 +24,10 @@ export default function LoginPage() {
     msgRef.current?.clear();
 
     try {
-      const res = await http("/api/auth/login", {
+      const res = await fetch(`/api/auth/login`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           username: values.username?.trim(),
           password: values.password,

@@ -41,7 +41,6 @@ export type WalletRow = {
     currency: string;
     balance: number | string;
     locked_balance: number | string;
-    free_spins: number | string;
     active: boolean;
     created_at: string;
 };
@@ -151,25 +150,6 @@ export async function fetchLedger(
     }).forEach(([k, v]) => v !== '' && url.searchParams.set(k, String(v)));
 
     const res = await http(url.pathname + url.search);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-}
-
-// ===== FREESPIN MANAGEMENT =====
-export async function resetFreeSpin(playerId: number, gameId: number): Promise<{ ok: boolean; message: string }> {
-    const res = await http(`/api/players/${playerId}/resetspin`, {
-        method: 'POST',
-        body: JSON.stringify({ gameId }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-}
-
-export async function setFreeSpin(playerId: number, gameId: number, freeSpins: number): Promise<{ ok: boolean; message: string }> {
-    const res = await http(`/api/players/${playerId}/setspin`, {
-        method: 'POST',
-        body: JSON.stringify({ gameId, freeSpins }),
-    });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
 }

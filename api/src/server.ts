@@ -13,12 +13,16 @@ import { signAccess, signRefresh, verifyAccess, verifyRefresh, JwtUser } from '.
 // nếu vẫn muốn chủ động:
 import './load-env';
 
-// Redis config
-const redis = new Redis({
+// Redis config - use password from REDIS_PASSWORD if available
+const redisPassword = process.env.REDIS_PASSWORD?.trim();
+const redisConfig: any = {
     host: process.env.REDIS_HOST || '127.0.0.1',
     port: Number(process.env.REDIS_PORT || 6379),
-    password: process.env.REDIS_PASSWORD,
-});
+};
+if (redisPassword) {
+    redisConfig.password = redisPassword;
+}
+const redis = new Redis(redisConfig);
 const Key = {
     ver: (gid: number, pid = 0) => `game:${gid}:config:ver:${pid}`,      // value = string timestamp
     eff: (gid: number, pid = 0) => `game:${gid}:config:eff:${pid}`,      // value = JSON { v, config, rtp }
@@ -92,8 +96,8 @@ app.post('/api/auth/login',
         const { rows } = await pool.query(`
       SELECT id, username, password_hash, email, role, is_active FROM admin_users WHERE username = $1 LIMIT 1
     `, [username]);
-        console.log('rows:', rows[0].is_active, rows[0]);
-        if (!rows[0] || !rows[0].is_active) return new Response('Sai tài khoản hoặc tài khoản bị khóa', { status: 401 });
+        if (!rows[0]) return new Response('Sai tài khoản hoặc mật khẩu', { status: 401 });
+        if (!rows[0].is_active) return new Response('Tài khoản bị khóa', { status: 401 });
 
         const ok = await bcrypt.compare(password, rows[0].password_hash);
         console.log('Password match:', ok);
@@ -250,7 +254,7 @@ app.get(
       `,
             [user.id]
         );
-        console.log('Current user:', rows[0]);
+
         if (!rows[0]) return new Response('Not found', { status: 404 });
 
         const me = rows[0];
@@ -272,7 +276,7 @@ app.get(
 
 // -------------------- GAMES ROUTES --------------------
 app.get('/api/games',
-    authGuard(async ({ query }) => {
+    async ({ query }) => {
         const q = (query as any).q?.toString().trim() ?? '';
         const category = (query as any).category as string | undefined;
         const status = (query as any).status as string | undefined;
@@ -301,8 +305,8 @@ app.get('/api/games',
             return new Response(JSON.stringify({ data, total, page, pageSize }), {
                 headers: { 'Content-Type': 'application/json' }
             });
-        }         finally { client.release(); }
-    }),
+        } finally { client.release(); }
+    },
     {
         query: t.Object({
             q: t.Optional(t.String()),
@@ -314,20 +318,18 @@ app.get('/api/games',
     }
 );
 
-app.get('/api/games/:id', 
-    authGuard(async ({ params }) => {
-        const r = await pool.query(
-            `SELECT id, code, name, category, rtp, volatility, status, icon_url, desc_short, updated_at
-         FROM games WHERE id = $1`, [params.id]);
-        // console.log('GET /api/games/:id', params.id, r);
-        if (!r.rowCount) return new Response('Not found', { status: 404 });
-        return new Response(JSON.stringify(r.rows[0]), { headers: { 'Content-Type': 'application/json' } });
-    })
-);
+app.get('/api/games/:id', async ({ params }) => {
+    const r = await pool.query(
+        `SELECT id, code, name, category, rtp, volatility, status, icon_url, desc_short, updated_at
+     FROM games WHERE id = $1`, [params.id]);
+    // console.log('GET /api/games/:id', params.id, r);
+    if (!r.rowCount) return new Response('Not found', { status: 404 });
+    return new Response(JSON.stringify(r.rows[0]), { headers: { 'Content-Type': 'application/json' } });
+});
 
 // Config gốc của game (base)
 app.patch('/api/games/:id/config',
-    authGuard(async ({ params, body }) => {
+    async ({ params, body }) => {
         const id = Number(params.id);
         if (!Number.isFinite(id)) return new Response('Bad game id', { status: 400 });
 
@@ -360,7 +362,7 @@ app.patch('/api/games/:id/config',
         await redis.publish('cfg:changed', JSON.stringify({ gameId: id, partnerId: 0 }));
 
         return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
-    }),
+    },
     {
         body: t.Partial(t.Object({
             config: t.Record(t.String(), t.Any()),
@@ -371,70 +373,66 @@ app.patch('/api/games/:id/config',
     }
 );
 
-app.get('/api/games/:id/config', 
-    authGuard(async ({ params }) => {
-        const id = Number(params.id);
-        if (!Number.isFinite(id)) return new Response('Bad game id', { status: 400 });
-        const r = await pool.query('SELECT id, code, config, rtp FROM games WHERE id=$1', [id]);
-        if (!r.rowCount) return new Response('Not found', { status: 404 });
-        return new Response(JSON.stringify(r.rows[0]), { headers: { 'Content-Type': 'application/json' } });
-    })
-);
+app.get('/api/games/:id/config', async ({ params }) => {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) return new Response('Bad game id', { status: 400 });
+    const r = await pool.query('SELECT id, code, config, rtp FROM games WHERE id=$1', [id]);
+    if (!r.rowCount) return new Response('Not found', { status: 404 });
+    return new Response(JSON.stringify(r.rows[0]), { headers: { 'Content-Type': 'application/json' } });
+});
 // Config hiệu lực theo partner (merge + Redis cache + version)
-app.get('/api/partners/:pid/games/:gid/config', 
-    authGuard(async ({ params }) => {
-        const partnerId = Number(params.pid);
-        const gameId = Number(params.gid);
+app.get('/api/partners/:pid/games/:gid/config', async ({ params }) => {
+    const partnerId = Number(params.pid);
+    const gameId = Number(params.gid);
 
-        const verKey = `games:cfg:ver:${partnerId}:${gameId}`;
-        let ver = await redis.get(verKey);
+    const verKey = `games:cfg:ver:${partnerId}:${gameId}`;
+    let ver = await redis.get(verKey);
 
-        // nếu chưa có version trong cache -> build từ PG
-        async function buildAndCache() {
-            const client = await pool.connect();
-            try {
-                const base = (await client.query(`SELECT id, code, config, rtp FROM games WHERE id = $1`, [gameId])).rows[0];
-                if (!base) return null;
-                const ov = (await client.query(
-                    `SELECT enabled, rtp_override, config AS config_override
-             FROM partner_games WHERE partner_id = $1 AND game_id = $2`,
-                    [partnerId, gameId]
-                )).rows[0];
+    // nếu chưa có version trong cache -> build từ PG
+    async function buildAndCache() {
+        const client = await pool.connect();
+        try {
+            const base = (await client.query(`SELECT id, code, config, rtp FROM games WHERE id = $1`, [gameId])).rows[0];
+            if (!base) return null;
+            const ov = (await client.query(
+                `SELECT enabled, rtp_override, config AS config_override
+         FROM partner_games WHERE partner_id = $1 AND game_id = $2`,
+                [partnerId, gameId]
+            )).rows[0];
 
-                const effective = deepMerge(base.config ?? {}, ov?.config_override ?? {});
-                const effRtp = ov?.rtp_override ?? base.rtp;
-                const nextVer = Date.now().toString();
+            const effective = deepMerge(base.config ?? {}, ov?.config_override ?? {});
+            const effRtp = ov?.rtp_override ?? base.rtp;
+            const nextVer = Date.now().toString();
 
-                await redis
-                    .multi()
-                    .set(`games:cfg:${gameId}:v${nextVer}`, JSON.stringify(base.config ?? {}))
-                    .set(`games:cfg:eff:${partnerId}:${gameId}:v${nextVer}`, JSON.stringify({ config: effective, rtp: effRtp }))
-                    .set(verKey, nextVer)
-                    .exec();
+            await redis
+                .multi()
+                .set(`games:cfg:${gameId}:v${nextVer}`, JSON.stringify(base.config ?? {}))
+                .set(`games:cfg:eff:${partnerId}:${gameId}:v${nextVer}`, JSON.stringify({ config: effective, rtp: effRtp }))
+                .set(verKey, nextVer)
+                .exec();
 
-                return { version: nextVer, config: effective, rtp: effRtp };
-            } finally { client.release(); }
-        }
+            return { version: nextVer, config: effective, rtp: effRtp };
+        } finally { client.release(); }
+    }
 
-        if (!ver) {
-            const built = await buildAndCache();
-            if (!built) return new Response('Not found', { status: 404 });
-            return new Response(JSON.stringify(built), { headers: { 'Content-Type': 'application/json' } });
-        }
+    if (!ver) {
+        const built = await buildAndCache();
+        if (!built) return new Response('Not found', { status: 404 });
+        return new Response(JSON.stringify(built), { headers: { 'Content-Type': 'application/json' } });
+    }
 
-        // có version rồi, lấy từ cache
-        const effStr = await redis.get(`games:cfg:eff:${partnerId}:${gameId}:v${ver}`);
-        if (effStr) {
-            const eff = JSON.parse(effStr);
-            return new Response(JSON.stringify({ version: ver, ...eff }), { headers: { 'Content-Type': 'application/json' } });
-        }
+    // có version rồi, lấy từ cache
+    const effStr = await redis.get(`games:cfg:eff:${partnerId}:${gameId}:v${ver}`);
+    if (effStr) {
+        const eff = JSON.parse(effStr);
+        return new Response(JSON.stringify({ version: ver, ...eff }), { headers: { 'Content-Type': 'application/json' } });
+    }
 
-        // mất key body -> rebuild
-        const rebuilt = await buildAndCache();
-        if (!rebuilt) return new Response('Not found', { status: 404 });
-        return new Response(JSON.stringify(rebuilt), { headers: { 'Content-Type': 'application/json' } });
-    })
-);
+    // mất key body -> rebuild
+    const rebuilt = await buildAndCache();
+    if (!rebuilt) return new Response('Not found', { status: 404 });
+    return new Response(JSON.stringify(rebuilt), { headers: { 'Content-Type': 'application/json' } });
+});
 
 // Invalidate cache khi bạn cập nhật config từ CMS (gọi endpoint này)
 app.post('/api/partners/:pid/games/:gid/config/invalidate', authGuard(async ({ params }) => {
@@ -572,7 +570,7 @@ app.get('/api/players/:playerId', authGuard(async ({ params }) => {
         if (!p.rowCount) return new Response('Not found', { status: 404 });
 
         const wallets = await client.query(
-            `SELECT id AS account_id, game_id, username, currency, balance, locked_balance, active, free_spins, created_at
+            `SELECT id AS account_id, game_id, username, currency, balance, locked_balance, active, created_at
        FROM player_accounts WHERE player_id=$1 ORDER BY game_id`, [playerId]);
 
         return new Response(JSON.stringify({ player: p.rows[0], wallets: wallets.rows }),
@@ -755,82 +753,6 @@ app.patch('/api/players/:playerId/active',
     { body: t.Object({ active: t.Boolean() }) }
 );
 
-// Reset freespin cho player
-app.post('/api/players/:playerId/resetspin',
-    authGuard(async ({ params, body, user }) => {
-        const playerId = Number(params.playerId);
-        const { gameId } = body as { gameId: number };
-        
-        if (!Number.isFinite(playerId)) return new Response('Bad player id', { status: 400 });
-        if (!Number.isFinite(gameId)) return new Response('Bad game id', { status: 400 });
-
-        // Kiểm tra player có tồn tại không
-        const playerCheck = await pool.query(`SELECT id FROM players WHERE id=$1`, [playerId]);
-        if (!playerCheck.rowCount) return new Response('Player not found', { status: 404 });
-
-        // Reset freespin về 0 cho game cụ thể
-        await pool.query(
-            `UPDATE player_accounts SET free_spins = 0 WHERE player_id = $1 AND game_id = $2`,
-            [playerId, gameId]
-        );
-
-        // Ghi log audit
-        console.log(`Admin ${user.username} reset freespin for player ${playerId}, game ${gameId}`);
-
-        return new Response(JSON.stringify({ 
-            ok: true, 
-            message: `Reset freespin thành công cho player ${playerId}, game ${gameId}` 
-        }), { headers: { 'Content-Type': 'application/json' } });
-    }),
-    { body: t.Object({ gameId: t.Number() }) }
-);
-
-// Set freespin cho player
-app.post('/api/players/:playerId/setspin',
-    authGuard(async ({ params, body, user }) => {
-        const playerId = Number(params.playerId);
-        const { gameId, freeSpins } = body as { gameId: number; freeSpins: number };
-        
-        if (!Number.isFinite(playerId)) return new Response('Bad player id', { status: 400 });
-        if (!Number.isFinite(gameId)) return new Response('Bad game id', { status: 400 });
-        if (!Number.isFinite(freeSpins) || freeSpins < 0) return new Response('Invalid freeSpins value', { status: 400 });
-
-        // Kiểm tra player có tồn tại không
-        const playerCheck = await pool.query(`SELECT id FROM players WHERE id=$1`, [playerId]);
-        if (!playerCheck.rowCount) return new Response('Player not found', { status: 404 });
-
-        // Đảm bảo player_accounts tồn tại cho game này
-        const accountCheck = await pool.query(
-            `SELECT id FROM player_accounts WHERE player_id = $1 AND game_id = $2`,
-            [playerId, gameId]
-        );
-
-        if (!accountCheck.rowCount) {
-            // Tạo account nếu chưa có
-            await pool.query(
-                `INSERT INTO player_accounts (player_id, game_id, username, currency, balance, locked_balance, active, free_spins)
-                 VALUES ($1, $2, '', 'VND', 0, 0, true, $3)`,
-                [playerId, gameId, freeSpins]
-            );
-        } else {
-            // Cập nhật freespin
-            await pool.query(
-                `UPDATE player_accounts SET free_spins = $1 WHERE player_id = $2 AND game_id = $3`,
-                [freeSpins, playerId, gameId]
-            );
-        }
-
-        // Ghi log audit
-        console.log(`Admin ${user.username} set freespin to ${freeSpins} for player ${playerId}, game ${gameId}`);
-
-        return new Response(JSON.stringify({ 
-            ok: true, 
-            message: `Set freespin thành công: ${freeSpins} cho player ${playerId}, game ${gameId}` 
-        }), { headers: { 'Content-Type': 'application/json' } });
-    }),
-    { body: t.Object({ gameId: t.Number(), freeSpins: t.Number() }) }
-);
-
 
 
 // (Tùy chọn) Update balance nhanh khi demo
@@ -860,7 +782,7 @@ app.patch(
 // -------------------- LOGS ROUTES --------------------
 app.get(
     '/api/logs/game',
-    authGuard(async ({ query }) => {
+    async ({ query }) => {
         // đảm bảo kết nối (an toàn khi chạy ở dev/hot-reload)
         // await connectMongo();
         console.log('✅ Mongo ready');
@@ -906,20 +828,13 @@ app.get(
             col.find(filter).sort(sortSpec).skip(skip).limit(pageSize).toArray()
         ]);
 
-        // log mẫu bản ghi mới nhất để kiểm tra cấu trúc
-        if (docs && docs.length > 0) {
-            console.log('[logs.game] sample doc:', docs[0]);
-        } else {
-            console.log('[logs.game] no docs matched filter', filter);
-        }
-
         // map _id -> string để FE làm rowKey
         const data = docs.map(d => ({ ...d, _id: d._id.toString() }));
 
         return new Response(JSON.stringify({ data, total, page, pageSize }), {
             headers: { 'Content-Type': 'application/json' }
         });
-    }),
+    },
     {
         query: t.Object({
             q: t.Optional(t.String()),
@@ -946,7 +861,7 @@ app.get(
 await connectMongo(); // đảm bảo Mongo sẵn sàng trước khi nhận request
 console.log('✅ Mongo ready');
 
-app.listen({ port: 3300, hostname: '0.0.0.0' })
+app.listen(Number(process.env.PORT || 3300));
 
 console.log(`✅ API running at http://localhost:${process.env.PORT || 3300}`);
 

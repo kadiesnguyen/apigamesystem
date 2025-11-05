@@ -9,7 +9,8 @@ export default ({ mode }) => {
   return defineConfig({
     plugins: [react(), tsconfigPaths()],
     build: {
-      outDir: 'dist3',
+
+      outDir: 'dist5',
     },
     server: {
       proxy: {

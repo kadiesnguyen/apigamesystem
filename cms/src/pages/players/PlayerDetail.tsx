@@ -8,8 +8,6 @@ import {
   deposit,
   withdraw,
   fetchLedger as fetchLedgerSvc,
-  resetFreeSpin,
-  setFreeSpin,
   type PlayerResp,
   type LedgerResp,
 } from "@/services/players";
@@ -130,16 +128,6 @@ export default function PlayerDetail({
     accountId?: number;
     gameId?: number;
   }>({ open: false });
-  const [resetSpinOpen, setResetSpinOpen] = useState<{
-    open: boolean;
-    accountId?: number;
-    gameId?: number;
-  }>({ open: false });
-  const [setSpinOpen, setSetSpinOpen] = useState<{
-    open: boolean;
-    accountId?: number;
-    gameId?: number;
-  }>({ open: false });
 
   // Ensure wallet form
   const [ensureForm, setEnsureForm] = useState({
@@ -158,9 +146,6 @@ export default function PlayerDetail({
     amount: "",
     reason: "CMS withdraw",
     refId: "",
-  });
-  const [setSpinForm, setSetSpinForm] = useState({
-    freeSpins: "",
   });
 
   // Ledger
@@ -380,43 +365,6 @@ export default function PlayerDetail({
     }
   }
 
-  async function doResetSpin() {
-    if (!resetSpinOpen.gameId || !data) return;
-    try {
-      await resetFreeSpin(data.player.id, resetSpinOpen.gameId);
-      setResetSpinOpen({ open: false });
-      await loadById(data.player.id); // Reload player data
-      message.success("Reset freespin thành công");
-    } catch (e: any) {
-      Modal.error({
-        title: "Lỗi reset freespin",
-        content: e?.message || "Không thể reset freespin",
-      });
-    }
-  }
-
-  async function doSetSpin() {
-    if (!setSpinOpen.gameId || !data) return;
-    try {
-      const freeSpins = Number(setSpinForm.freeSpins);
-      if (!Number.isFinite(freeSpins) || freeSpins < 0) {
-        message.error("Số freespin phải là số nguyên dương");
-        return;
-      }
-      
-      await setFreeSpin(data.player.id, setSpinOpen.gameId, freeSpins);
-      setSetSpinOpen({ open: false });
-      setSetSpinForm({ freeSpins: "" });
-      await loadById(data.player.id); // Reload player data
-      message.success(`Set freespin thành công: ${freeSpins}`);
-    } catch (e: any) {
-      Modal.error({
-        title: "Lỗi set freespin",
-        content: e?.message || "Không thể set freespin",
-      });
-    }
-  }
-
   return (
     <div style={{ padding: 24, width: "100%" }}>
       <Space align="end" style={{ marginBottom: 16 }}>
@@ -548,16 +496,6 @@ export default function PlayerDetail({
                   render: (v: any) => fmt.format(Number(v)),
                 },
                 {
-                  title: "Free Spins",
-                  dataIndex: "free_spins",
-                  align: "center" as const,
-                  render: (v: any) => (
-                    <Tag color={Number(v) > 0 ? "blue" : "default"}>
-                      {Number(v) || 0}
-                    </Tag>
-                  ),
-                },
-                {
                   title: "Trạng thái",
                   dataIndex: "active",
                   align: "center" as const,
@@ -572,7 +510,7 @@ export default function PlayerDetail({
                   key: "actions",
                   align: "right" as const,
                   render: (_: any, w: any) => (
-                    <Space wrap>
+                    <Space>
                       <Button
                         type="primary"
                         onClick={() => {
@@ -606,29 +544,6 @@ export default function PlayerDetail({
                         }}
                       >
                         Rút
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setResetSpinOpen({
-                            open: true,
-                            accountId: w.account_id,
-                            gameId: w.game_id,
-                          });
-                        }}
-                      >
-                        Reset Spin
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSetSpinOpen({
-                            open: true,
-                            accountId: w.account_id,
-                            gameId: w.game_id,
-                          });
-                          setSetSpinForm({ freeSpins: "" });
-                        }}
-                      >
-                        Set Spin
                       </Button>
                       {/* <Button
                         onClick={() => openLedger(w.account_id, w.game_id)}
@@ -849,48 +764,6 @@ export default function PlayerDetail({
             },
           ]}
         />
-      </Modal>
-
-      {/* Reset Spin modal */}
-      <Modal
-        open={resetSpinOpen.open}
-        onCancel={() => setResetSpinOpen({ open: false })}
-        title={`Reset Freespin (Game ${resetSpinOpen.gameId || ""})`}
-        okText="Reset"
-        okButtonProps={{ danger: true }}
-        onOk={doResetSpin}
-      >
-        <div style={{ padding: "16px 0" }}>
-          <Text>
-            Bạn có chắc chắn muốn reset freespin về 0 cho game {resetSpinOpen.gameId}?
-          </Text>
-        </div>
-      </Modal>
-
-      {/* Set Spin modal */}
-      <Modal
-        open={setSpinOpen.open}
-        onCancel={() => setSetSpinOpen({ open: false })}
-        title={`Set Freespin (Game ${setSpinOpen.gameId || ""})`}
-        okText="Set"
-        onOk={doSetSpin}
-      >
-        <Space direction="vertical" style={{ width: "100%" }}>
-          <div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>
-              Số freespin
-            </div>
-            <InputNumber
-              value={setSpinForm.freeSpins}
-              onChange={(v) =>
-                setSetSpinForm((f) => ({ ...f, freeSpins: String(v ?? "") }))
-              }
-              style={{ width: "100%" }}
-              min={0}
-              placeholder="Nhập số freespin"
-            />
-          </div>
-        </Space>
       </Modal>
     </div>
   );
