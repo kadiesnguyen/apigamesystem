@@ -52,5 +52,14 @@ export const setupApp = async (): Promise<SetupResult> => {
     return g;
   });
 
+  // Health check endpoint
+  app.get('/health', () => {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'game-server'
+    };
+  });
+
   return { app, postgres, mongoDb, redisClient };
 };

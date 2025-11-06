@@ -858,6 +858,15 @@ app.get(
     }
 );
 
+// Health check endpoint
+app.get('/health', () => {
+    return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        service: 'api-server'
+    };
+});
+
 await connectMongo(); // đảm bảo Mongo sẵn sàng trước khi nhận request
 console.log('✅ Mongo ready');
 

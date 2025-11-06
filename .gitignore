@@ -1,0 +1,270 @@
+# =============================================================================
+# Game System .gitignore
+# =============================================================================
+# Comprehensive gitignore for the entire game system project
+
+# -----------------------------------------------------------------------------
+# Environment & Configuration Files
+# -----------------------------------------------------------------------------
+# Individual service .env files (now centralized in root .env)
+api/.env
+cms/.env
+Server/.env
+Server/.env.save
+.env.docker
+.env.backup/
+
+# All environment files (security best practice)
+.env
+**/.env
+.env.local
+.env.production
+.env.staging
+.env.test
+.env.development
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Allow template files (safe to track)
+!.env.template
+!**/.env.template
+
+# Backup and temporary configuration files
+*.env.bak
+*.env.backup
+.env-backup/
+
+# -----------------------------------------------------------------------------
+# Docker & Container Files
+# -----------------------------------------------------------------------------
+# Docker volumes and data (let Docker handle persistence)
+docker-data/
+volumes/
+.docker/
+
+# Docker override files (for local customization)
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.prod.yml
+
+# -----------------------------------------------------------------------------
+# Dependencies & Package Files
+# -----------------------------------------------------------------------------
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log
+
+# Bun
+.bun/
+bun.lockb
+
+# Package lock files (comment out if you want to track them)
+# package-lock.json
+# yarn.lock
+
+# -----------------------------------------------------------------------------
+# Build & Distribution Files
+# -----------------------------------------------------------------------------
+# Build outputs
+dist/
+dist-ssr/
+build/
+out/
+coverage/
+*.tgz
+*.tar.gz
+
+# Vite build cache
+.vite/
+vite.config.*.timestamp-*
+
+# TypeScript build info
+*.tsbuildinfo
+
+# -----------------------------------------------------------------------------
+# Logs & Monitoring
+# -----------------------------------------------------------------------------
+# Application logs
+logs/
+*.log
+log/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output/
+
+# Runtime data
+.cache/
+.temp/
+tmp/
+temp/
+
+# -----------------------------------------------------------------------------
+# Database & Storage
+# -----------------------------------------------------------------------------
+# Database files (let Docker volumes handle persistence)
+*.db
+*.sqlite
+*.sqlite3
+data/
+db-data/
+
+# Backup files
+*.sql.backup
+*.dump
+backups/*.sql
+
+# -----------------------------------------------------------------------------
+# IDE & Editor Files
+# -----------------------------------------------------------------------------
+# Visual Studio Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# -----------------------------------------------------------------------------
+# Operating System Files
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# -----------------------------------------------------------------------------
+# Security & Sensitive Files
+# -----------------------------------------------------------------------------
+# SSH keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# SSL certificates
+*.crt
+*.cer
+*.p7b
+*.p7s
+*.spc
+
+# API keys and secrets
+secrets/
+.secrets/
+credentials.json
+service-account.json
+
+# -----------------------------------------------------------------------------
+# Development & Testing
+# -----------------------------------------------------------------------------
+# Test results
+test-results/
+junit.xml
+coverage-report/
+
+# Storybook
+storybook-static/
+
+# Jest
+.jest-cache/
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache  
+.prettierignore
+
+# -----------------------------------------------------------------------------
+# Miscellaneous
+# -----------------------------------------------------------------------------
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Archive files
+*.zip
+*.rar
+*.7z
+
+# Local development helper scripts
+dev-*.sh
+local-*.sh
+test-local.*
+
+# Documentation builds
+docs/build/
+site/
+
+# -----------------------------------------------------------------------------
+# Project Specific
+# -----------------------------------------------------------------------------
+# Migration and setup documentation (comment out if you want to keep them)
+*-MIGRATION-*.md
+*-SETUP-*.md
+*-COMPLETE*.md
+ENV-MIGRATION-COMPLETE.md
+
+# Old backup scripts
+start-game-system.sh.bak
+stop-game-system.sh.bak
+
+# =============================================================================
+# Notes:
+# - Root .env is tracked for development convenience
+# - Individual service .env files are ignored (now centralized)
+# - Docker volumes handled by Docker, not Git
+# - Keep IDE settings that are useful for the team
+# - Exclude sensitive production configuration
+# =============================================================================

@@ -1,15 +1,33 @@
-# serverslot
+# Game Server
 
-To install dependencies:
+WebSocket game logic server built with Bun and Elysia framework for real-time gaming experiences.
+
+## Features
+
+- Real-time WebSocket communication
+- Game logic processing
+- Player authentication with signed requests
+- Partner API management
+- Transaction handling
+
+## Development
 
 ```bash
+# Install dependencies
 bun install
+
+# Start development server
+bun run dev
+
+# Run production
+bun run start
 ```
 
-To run:
+## API Authentication
 
-```bash
-bun run index.ts
-```
+All requests require HMAC-SHA256 signed headers:
+- `x-api-key`: Partner API key
+- `x-timestamp`: Request timestamp  
+- `x-signature`: Generated signature
 
-This project was created using `bun init` in bun v1.2.19. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+See the main README.md for complete documentation.
