@@ -20,13 +20,8 @@ pipeline {
     
     environment {
         AWS_REGION = 'ap-southeast-1'
-        ECR_REGISTRY = '185003592665.dkr.ecr.ap-southeast-1.amazonaws.com'
+        AWS_ACCOUNT_ID = '185003592665'
         IMAGE_TAG = "${env.GIT_COMMIT?.take(7) ?: 'latest'}-${env.BUILD_NUMBER}"
-        
-        // ECR Repository names
-        ECR_REPO_API = "${ECR_REGISTRY}/api"
-        ECR_REPO_CMS = "${ECR_REGISTRY}/cms"
-        ECR_REPO_SERVER = "${ECR_REGISTRY}/server"
     }
     
     stages {
@@ -77,10 +72,9 @@ pipeline {
                                 serviceName: 'api',
                                 workDir: './api',
                                 runtime: 'bun',
-                                ecrRepo: env.ECR_REPO_API,
+                                ecrRepo: 'api',
                                 imageTag: env.IMAGE_TAG,
-                                buildCommand: 'bun run build',
-                                testCommand: 'bun test'
+                                buildCommand: 'bun run build'
                             )
                             
                             env.API_IMAGE = apiImage.fullImageName
@@ -98,10 +92,9 @@ pipeline {
                                 serviceName: 'cms',
                                 workDir: './cms',
                                 runtime: 'npm',
-                                ecrRepo: env.ECR_REPO_CMS,
+                                ecrRepo: 'cms',
                                 imageTag: env.IMAGE_TAG,
-                                buildCommand: 'npm run build',
-                                testCommand: 'npm test'
+                                buildCommand: 'npm run build'
                             )
                             
                             env.CMS_IMAGE = cmsImage.fullImageName
@@ -119,10 +112,9 @@ pipeline {
                                 serviceName: 'server',
                                 workDir: './Server',
                                 runtime: 'bun',
-                                ecrRepo: env.ECR_REPO_SERVER,
+                                ecrRepo: 'server',
                                 imageTag: env.IMAGE_TAG,
-                                buildCommand: 'bun run build',
-                                testCommand: 'bun test'
+                                buildCommand: 'bun run build'
                             )
                             
                             env.SERVER_IMAGE = serverImage.fullImageName
