@@ -90,8 +90,9 @@ vite.config.*.timestamp-*
 # -----------------------------------------------------------------------------
 # Logs & Monitoring
 # -----------------------------------------------------------------------------
-# Application logs
+# Application logs (but not source code in cms/src/pages/logs)
 logs/
+!cms/src/pages/logs/
 *.log
 log/
 pids/
