@@ -5,7 +5,7 @@ import MobileSidebar from 'layouts/main-layout/sidebar/MobileSidebar';
 import Sidebar from 'layouts/main-layout/sidebar/Sidebar';
 import { PropsWithChildren, useState } from 'react';
 
-const drawerWidth = { lg: 250, md: 240, sm: 230 };
+const drawerWidth = { lg: 300, md: 260, sm: 250 };
 
 const MainLayout = ({ children }: PropsWithChildren) => {
   const [mobileOpen, setMobileOpen] = useState(false);

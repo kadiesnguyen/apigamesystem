@@ -28,9 +28,9 @@ const Dashboard = () => {
       </Grid>
 
       {/* ------------- Data-Grid section ---------------- */}
-      <Grid item xs={12}>
+      {/* <Grid item xs={12}>
         <InvoiceOverviewTable />
-      </Grid>
+      </Grid> */}
     </Grid>
   );
 };

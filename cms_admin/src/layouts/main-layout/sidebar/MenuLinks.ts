@@ -1,6 +1,7 @@
 import { SvgIconProps } from '@mui/material';
 import CreditCardIcon from 'components/icons/menu-icons/CreditCardIcon';
 import HomeIcon from 'components/icons/menu-icons/HomeIcon';
+import IntegrationIcon from 'components/icons/menu-icons/IntegrationIcon';
 import InvestIcon from 'components/icons/menu-icons/InvestIcon';
 import LoanIcon from 'components/icons/menu-icons/LoanIcon';
 import ServiceIcon from 'components/icons/menu-icons/ServiceIcon';
@@ -12,13 +13,12 @@ import UserIcon from 'components/icons/menu-icons/UserIcon';
 
 export enum linkEnum {
   Dashboard = 'dashboard',
-  Transactions = 'transactions',
-  Accounts = 'accounts',
-  Investments = 'investments',
-  Credit = 'credit-cards',
-  Loans = 'loans',
-  Services = 'Services',
-  Setting = 'Setting',
+  AnalyticsReporting = 'Analytics  Reporting',
+  Partner = 'Partner',
+  PartnerBalance = 'Partner Balance',
+  Monitoring = 'Monitoring & Logs',
+  Security = 'Security & Access Control',
+  Integration = 'Integration & Customization',
   Login = 'login',
   Signup = 'sign-up',
   ForgetPassword = 'forget-password',
@@ -42,65 +42,59 @@ export const menuLinks: MenuLinkType[] = [
   },
   {
     id: 2,
-    title: linkEnum.Transactions,
+    title: linkEnum.Partner,
     link: '#!',
-    icon: TransferIcon,
-    available: false,
+    icon: UserIcon,
+    available: true,
   },
   {
     id: 3,
-    title: linkEnum.Accounts,
+    title: linkEnum.PartnerBalance,
     link: '#!',
-    icon: UserIcon,
-    available: false,
+    icon: CreditCardIcon,
+    available: true,
   },
   {
     id: 4,
-    title: linkEnum.Investments,
+    title: linkEnum.AnalyticsReporting,
     link: '#!',
     icon: InvestIcon,
-    available: false,
+    available: true,
   },
   {
     id: 5,
-    title: linkEnum.Credit,
+    title: linkEnum.Monitoring,
     link: '#!',
-    icon: CreditCardIcon,
-    available: false,
+    icon: ServiceIcon,
+    available: true,
   },
   {
     id: 6,
-    title: linkEnum.Loans,
+    title: linkEnum.Security,
     link: '#!',
-    icon: LoanIcon,
-    available: false,
+    icon: SettingsIcon,
+    available: true,
   },
   {
     id: 7,
-    title: linkEnum.Services,
+    title: linkEnum.Integration,
     link: '#!',
-    icon: ServiceIcon,
-    available: false,
-  },
-  {
-    id: 8,
-    title: linkEnum.Setting,
-    link: '#!',
-    icon: SettingsIcon,
-    available: false,
-  },
-  {
-    id: 9,
-    title: linkEnum.Login,
-    link: '/authentication/login',
-    icon: SignInIcon,
+    icon: IntegrationIcon,
     available: true,
   },
-  {
-    id: 10,
-    title: linkEnum.Signup,
-    link: '/authentication/sign-up',
-    icon: SignUpIcon,
-    available: true,
-  },
+
+  // {
+  //   id: 9,
+  //   title: linkEnum.Login,
+  //   link: '/authentication/login',
+  //   icon: SignInIcon,
+  //   available: true,
+  // },
+  // {
+  //   id: 10,
+  //   title: linkEnum.Signup,
+  //   link: '/authentication/sign-up',
+  //   icon: SignUpIcon,
+  //   available: true,
+  // },
 ];
