@@ -124,6 +124,23 @@ pipeline {
                 }
             }
         }
+        
+        stage('Update ArgoCD Manifests') {
+            steps {
+                script {
+                    updateArgoCDManifests(
+                        repoUrl: 'git@github.com:apigame-devops/application-microservices.git',
+                        credentialsId: 'github-ssh-credentials',
+                        environment: 'staging',
+                        services: [
+                            [name: 'api', imageTag: env.IMAGE_TAG],
+                            [name: 'cms', imageTag: env.IMAGE_TAG],
+                            [name: 'server', imageTag: env.IMAGE_TAG]
+                        ]
+                    )
+                }
+            }
+        }
     }
     
     post {
