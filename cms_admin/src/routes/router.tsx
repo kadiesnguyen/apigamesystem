@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import paths, { rootPaths } from './path';
+import Partner from 'pages/partner';
 
 /* ---------------- Lazy loads various components ------------------------- */
 const App = lazy(() => import('App'));
@@ -44,8 +45,8 @@ export const routes = [
             element: <Dashboard />,
           },
           {
-            path: paths.transactions,
-            element: <Dashboard />,
+            path: paths.partner,
+            element: <Partner />,
           },
         ],
       },

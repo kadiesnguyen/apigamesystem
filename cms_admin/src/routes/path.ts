@@ -10,7 +10,7 @@ export const rootPaths = {
  */
 const paths = {
   default: `${rootPaths.root}`,
-  transactions: `${rootPaths.pagesRoot}transactions`,
+  partner: `${rootPaths.pagesRoot}partner`,
   creditCards: `${rootPaths.pagesRoot}credit-cards`,
   investments: `${rootPaths.pagesRoot}investments`,
   loans: `${rootPaths.pagesRoot}loans`,

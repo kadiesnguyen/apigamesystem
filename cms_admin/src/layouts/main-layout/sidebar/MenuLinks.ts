@@ -43,7 +43,7 @@ export const menuLinks: MenuLinkType[] = [
   {
     id: 2,
     title: linkEnum.Partner,
-    link: '#!',
+    link: '/partner',
     icon: UserIcon,
     available: true,
   },
