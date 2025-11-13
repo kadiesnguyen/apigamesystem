@@ -26,7 +26,6 @@ import { useBreakpoints } from 'providers/useBreakpoints';
 import { SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
 const columns: GridColDef[] = [
-  { flex: 0.1, minWidth: 80, field: 'index', headerName: 'STT' },
   {
     field: 'fullName',
     headerName: 'Full Name',
@@ -131,7 +130,7 @@ const ListPartnerTable: React.FC = () => {
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
-    pageSize: 100,
+    pageSize: 50,
   });
 
   useEffect(() => {
