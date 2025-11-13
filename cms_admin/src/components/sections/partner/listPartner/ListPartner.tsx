@@ -18,6 +18,9 @@ import {
 } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel, GridRowsProp } from '@mui/x-data-grid';
 import IconifyIcon from 'components/base/IconifyIcon';
+import DataGridDeleteIcon from 'components/icons/table-icons/DataGridDeleteIcon';
+import DataGridEditIcon from 'components/icons/table-icons/DataGridEditIcon';
+import DataGridSendMailIcon from 'components/icons/table-icons/DataGridSendMailIcon';
 import CustomPagination from 'components/sections/dashboard/invoice/CustomPagination';
 import NoData from 'components/sections/dashboard/invoice/NoData';
 import { partnerRowData, RowPartnerData } from 'data/partner-data';
@@ -26,6 +29,7 @@ import { useBreakpoints } from 'providers/useBreakpoints';
 import { SyntheticEvent, useEffect, useMemo, useState } from 'react';
 
 const columns: GridColDef[] = [
+  { field: 'id', headerName: 'ID', minWidth: 100, flex: 0.1 },
   {
     field: 'fullName',
     headerName: 'Full Name',
@@ -47,7 +51,6 @@ const columns: GridColDef[] = [
       </Box>
     ),
   },
-  { field: 'id', headerName: 'ID', minWidth: 100, flex: 1 },
   { field: 'phone', headerName: 'Phone', minWidth: 100, flex: 1 },
   { field: 'username', headerName: 'Username', minWidth: 100, flex: 1 },
   { field: 'email', headerName: 'Email', minWidth: 100, flex: 1 },
@@ -83,33 +86,15 @@ const columns: GridColDef[] = [
 
     renderCell: (params) => (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', height: 'auto', gap: '5px' }}>
-        <Button variant="outlined" size="medium" onClick={() => console.log(params.row)}>
-          Edit
-        </Button>
-        <Button
-          color="secondary"
-          variant="outlined"
-          size="medium"
-          onClick={() => console.log(params.row)}
-        >
-          View
-        </Button>
-        <Button
-          color="success"
-          variant="outlined"
-          size="medium"
-          onClick={() => console.log(params.row)}
-        >
-          Approve
-        </Button>
-        <Button
-          variant="outlined"
-          color="warning"
-          size="medium"
-          onClick={() => console.log(params.row)}
-        >
-          Send Mail
-        </Button>
+        <IconButton onClick={() => console.log(params.row)}>
+          <DataGridEditIcon width="26px" height="26px" />
+        </IconButton>
+        <IconButton onClick={() => console.log(params.row)}>
+          <DataGridSendMailIcon fill="green" width="26px" height="26px" />
+        </IconButton>
+        <IconButton onClick={() => console.log(params.row)}>
+          <DataGridDeleteIcon fill="red" width="26px" height="26px" />
+        </IconButton>
       </Box>
     ),
   },
