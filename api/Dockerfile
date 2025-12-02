@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package.json bun.lockb* ./
 
-# Install dependencies
-RUN bun install
+# Install dependencies (ignore scripts to avoid Kaniko snapshot issues)
+RUN bun install --ignore-scripts
 
 # Copy source code
 COPY . .
