@@ -1,18 +1,21 @@
-// src/games/slots/mahjongway2/ws-handler.ts
+// src/games/slots/mahjongway/ws-handler.ts
 import type { WebSocket, RawData } from 'ws';
 import type { Pool } from 'pg';
 import type { Db } from 'mongodb';
-import { MahjongWay2Logic } from './logic';
-import { parseJwt } from '../../../utils/jwt.util';
+import { MahjongWayLogic } from './logic';
+import { parseJwt, verifyToken } from '../../../utils/jwt.util';
 import { userController } from '../../../controllers/user.controller';
 
-export async function mahjongway2SocketHandler(
+
+export async function mahjongwaySocketHandler(
     ws: WebSocket,
     token: string,
     pg: Pool,
     mongoDb: Db
 ) {
-    const logic = new MahjongWay2Logic(pg, mongoDb);
+    // console.log(mongoDb);
+    const logic = new MahjongWayLogic(pg, mongoDb);
+    // 1) Xác thực token
     let userId: number;
     try {
         const payload = parseJwt(token);
@@ -22,9 +25,11 @@ export async function mahjongway2SocketHandler(
             type: 'authError',
             message: 'Token không hợp lệ hoặc đã hết hạn'
         }));
+        // Đóng kết nối với mã 4001 (Unauthorized) và lý do
         return ws.close(4001, 'Unauthorized');
     }
 
+    // 2) Lắng nghe message từ client
     ws.on('message', async (raw: RawData) => {
         let msg;
         try {
@@ -37,6 +42,7 @@ export async function mahjongway2SocketHandler(
             case 'spin': {
                 const bet = msg.payload?.bet ?? 1;
 
+                // ✅ VALIDATE BET AMOUNT
                 if (!Number.isFinite(bet) || bet <= 0 || bet > 10000) {
                     return ws.send(JSON.stringify({
                         type: 'spinResult',
@@ -48,16 +54,17 @@ export async function mahjongway2SocketHandler(
                 try {
                     const result = await logic.spin(userId, bet);
 
-                    if (result.success === false) {
-                        return ws.send(JSON.stringify({
-                            type: 'spinResult',
-                            payload: {
-                                success: false,
-                                error: result.error ?? result.reason ?? 'Spin failed'
-                            }
-                        }));
-                    }
-
+                if (result.success === false) {
+                    return ws.send(JSON.stringify({
+                        type: 'spinResult',
+                        payload: {
+                            success: false,
+                            error: result.error ?? result.reason ?? 'Spin failed'
+                        }
+                    }));
+                }
+                    // console.log(`✅ User ${userId} spun with bet=${bet}, result:`, result);
+                    // ✅ Gửi kết quả spin tối ưu
                     const payload = {
                         success: true,
                         totalWin: result.totalWin,
@@ -67,10 +74,35 @@ export async function mahjongway2SocketHandler(
                         rounds: result.rounds
                     };
 
+                    // console.log('\n🧾 MahjongWay spin result payload:', JSON.stringify({
+                    //     userId,
+                    //     bet,
+                    //     ...payload,
+                    //     roundsSummary: payload.rounds.map((round: any) => ({
+                    //         index: round.index,
+                    //         // stepWin: round.stepWin,
+                    //         // multiplier: round.multiplier,
+                    //         // wins: {
+                    //         //     normal: round.win?.normal?.length ?? 0,
+                    //         //     wild: round.win?.wild?.length ?? 0
+                    //         // },
+                    //         // flips: round.flips?.length ?? 0,
+                    //         // copies: round.copies?.length ?? 0,
+                    //         // hasNext: round.hasNext === true
+                    //     }))
+                    // }, null, 2));
+
                     ws.send(JSON.stringify({
                         type: 'spinResult',
                         payload
                     }));
+                    // console.log(result.rounds.length, 'rounds in spin result');
+                    // console.log(result.rounds);
+                    // for (const round of result.rounds) {
+                    //     // console.log(`Round thứ ${result.rounds.indexOf(round) + 1}`);
+                    //     console.log(round.grid);
+                    // }
+                    // console.log(`✅ Gửi spinResult của user ${userId}: win=${result.totalWin}`);
                 } catch (err: any) {
                     ws.send(JSON.stringify({ type: 'error', error: err.message }));
                 }
@@ -83,12 +115,14 @@ export async function mahjongway2SocketHandler(
                     const requestedGameId = typeof parsedGameId === 'number' && Number.isFinite(parsedGameId)
                         ? parsedGameId
                         : undefined;
+                    // console.log(`📄 User ${userId} requested profile`);
                     const profile = await userController.getProfile({
                         userId,
                         postgres: pg,
                         store: { userId },
                         gameId: requestedGameId
                     });
+                    // console.log(`📄 Lấy thông tin profile của user ${userId}:`, profile);
                     ws.send(JSON.stringify({ type: 'getProfileResult', payload: profile }));
                 } catch (err: any) {
                     ws.send(JSON.stringify({ type: 'error', error: err.message }));
@@ -141,8 +175,8 @@ export async function mahjongway2SocketHandler(
         }
     });
 
+    // 3) Khi client đóng kết nối
     ws.on('close', () => {
-        console.log(`🛑 MahjongWay2 user ${userId} disconnected`);
+        console.log(`🛑 MahjongWay user ${userId} disconnected`);
     });
 }
-

@@ -18,7 +18,10 @@ export const pool = new Pool(base);
 console.log('✅ DB pool (Postgres) created');
 
 // ---------- MongoDB ----------
-const mongoUrl = process.env.MONGO_URL || 'mongodb://localhost:27017';
+const mongoUrl =
+  process.env.MONGO_URL ||
+  process.env.MONGO_URI ||
+  'mongodb://localhost:27017';
 export const mongoClient = new MongoClient(mongoUrl);
 export let mongoDb: ReturnType<MongoClient['db']>;
 
@@ -28,7 +31,7 @@ export async function connectMongo() {
     await mongoClient.connect();
     console.log('✅ MongoDB connected');
   }
-  const dbName = process.env.MONGO_DB || 'logs'; // mặc định 'logs'
+  const dbName = process.env.MONGO_DB || process.env.MONGO_DB_NAME || 'logs'; // mặc định 'logs'
   mongoDb = mongoClient.db(dbName);
   return mongoDb;
 }

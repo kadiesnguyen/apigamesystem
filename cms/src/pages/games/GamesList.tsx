@@ -150,8 +150,8 @@ export default function GamesList() {
           ]}
         />
         <div className="flex-1" />
-        <Button type="primary" onClick={() => nav("/games/new")} disabled>
-          Thêm trò chơi (sau)
+        <Button type="primary" onClick={() => nav("/games/new")}>
+          Thêm trò chơi
         </Button>
       </div>
       {/* tạo 1 khoảng trắng */}

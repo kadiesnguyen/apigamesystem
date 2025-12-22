@@ -3,28 +3,36 @@
 export const MahjongWay2Config = {
     GameName: 'MahjongWay2',
     GameId: '1002',
-    
+
     Cols: 5,
-    Rows: 4,
+    Rows: 5,                // MahjongWay2 có 2000 ways với thêm một hàng
+    RowsAbove: 4,
 
     InitialLayout: [
-        [3, 3, 3, 3],
-        [2, 2, 2, 2],
-        [1, 1, 1, 1],
-        [0, 0, 0, 0],
-        [4, 4, 4, 4],
+        [3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2],
+        [1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0],
+        [4, 4, 4, 4, 4],
     ],
 
-    Gravity: 'refill' as 'collapse' | 'refill', // 'collapse' (cũ) hoặc 'refill' (giữ vị trí)
-    FreeSpinAward: 10,
+    Gravity: 'collapse' as 'collapse' | 'refill',
+    FreeSpinAward: 12,
+    ExtraFreeSpinsPerScatter: 3,
+    GoldenReelIndexes: [1, 2, 3],
+
+    BaseBet: 20,
+    DebugSpinLog: true,
+
     SymbolNames: [
-        'J',  // idx = 0
-        'Q',  // idx = 1
-        'K',  // idx = 2
-        'A',  // idx = 3
-        '♠',  // idx = 4
-        '♣',  // idx = 5
-        '♦',  // idx = 6
-        '♥',  // idx = 7
+        'Fa',
+        'Zhong',
+        'TileBlue',
+        'TileWan',
+        'Dots4',
+        'Bamboo4',
+        'Dots1',
+        'Bamboo2',
     ]
 };
+

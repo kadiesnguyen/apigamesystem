@@ -1,3 +1,5 @@
+import { http } from '@/lib/http';
+
 export type Game = {
     id: number;                            // bạn đã chốt INTEGER id
     code: string;
@@ -27,19 +29,19 @@ export async function fetchGames(params: {
     search.set("page", String(params.page ?? 1));
     search.set("pageSize", String(params.pageSize ?? 10));
 
-    const res = await fetch(`/api/games?${search.toString()}`);
+    const res = await http(`/api/games?${search.toString()}`);
     if (!res.ok) throw new Error("Fetch games failed");
     return (await res.json()) as Paged<Game>;
 }
 
 export async function fetchGame(id: number) {
-    const res = await fetch(`/api/games/${id}`);
+    const res = await http(`/api/games/${id}`);
     if (!res.ok) throw new Error("Game not found");
     return (await res.json()) as Game;
 }
 
 export async function fetchGameConfig(gameId: number) {
-    const r = await fetch(`/api/games/${gameId}/config`);
+    const r = await http(`/api/games/${gameId}/config`);
     console.log("fetchGameConfig", gameId, r);
     if (!r.ok) throw new Error(await r.text());
     return r.json() as Promise<{ id: number; code: string; rtp: number; config: any }>;
@@ -51,9 +53,8 @@ export async function updateGameConfig(gameId: number, payload: {
     status?: "active" | "inactive" | "draft";
     config?: any;
 }) {
-    const r = await fetch(`/api/games/${gameId}/config`, {
+    const r = await http(`/api/games/${gameId}/config`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(await r.text());
@@ -62,7 +63,7 @@ export async function updateGameConfig(gameId: number, payload: {
 
 /** (optional) effective + override theo partner */
 export async function fetchEffectiveConfig(partnerId: number, gameId: number) {
-    const r = await fetch(`/api/partners/${partnerId}/games/${gameId}/config`);
+    const r = await http(`/api/partners/${partnerId}/games/${gameId}/config`);
     if (!r.ok) throw new Error(await r.text());
     return r.json() as Promise<{ version: string; config: any; rtp: number }>;
 }
@@ -71,14 +72,44 @@ export async function updatePartnerOverride(partnerId: number, gameId: number, p
     rtp_override?: number;
     config?: any;
 }) {
-    const r = await fetch(`/api/partners/${partnerId}/games/${gameId}/config`, {
+    const r = await http(`/api/partners/${partnerId}/games/${gameId}/config`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
 }
 export async function invalidateEffective(partnerId: number, gameId: number) {
-    await fetch(`/api/partners/${partnerId}/games/${gameId}/config/invalidate`, { method: "POST" });
+    await http(`/api/partners/${partnerId}/games/${gameId}/config/invalidate`, { method: "POST" });
+}
+
+export type CreateGamePayload = {
+    id: number;
+    code: string;
+    name: string;
+    category: Game["category"];
+    rtp: number;
+    volatility: Game["volatility"];
+    status: Game["status"];
+    iconUrl?: string;
+    descShort?: string;
+    config?: Record<string, any>;
+    partners?: Array<{
+        partnerId: number;
+        enabled?: boolean;
+        rtp_override?: number;
+        sort_order?: number;
+        config?: Record<string, any>;
+    }>;
+};
+
+export async function createGame(payload: CreateGamePayload) {
+    const res = await http(`/api/games`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        throw new Error(await res.text());
+    }
+    return res.json() as Promise<{ ok: boolean; game: Game }>;
 }

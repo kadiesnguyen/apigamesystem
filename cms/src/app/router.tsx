@@ -4,6 +4,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import Login from "@/pages/login/Login";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import GamesList from "@/pages/games/GamesList";
+import GameCreate from "@/pages/games/GameCreate";
 import GameLayout from "@/pages/games/GameLayout";
 import Players from "@/pages/players/Players";
 import GameLogs from "@/pages/logs/GameLogs";
@@ -19,9 +20,10 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
 
-          { path: "dashboard", element: <Dashboard /> },
+          { path: "/dashboard", element: <Dashboard /> },
 
           { path: "/games/list", element: <GamesList /> },
+          { path: "/games/new", element: <GameCreate /> },
 
           { path: "/games", element: <Navigate to="/games/list" replace /> },
 

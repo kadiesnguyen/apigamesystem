@@ -85,16 +85,68 @@ export async function superaceSocketHandler(
                 }
                 break;
             }
-            case 'getProfile':
+            case 'getProfile': {
                 try {
+                    const rawGameId = msg.payload?.gameID ?? msg.payload?.gameId ?? msg.payload?.game_id;
+                    const parsedGameId = rawGameId !== undefined ? Number(rawGameId) : undefined;
+                    const requestedGameId = typeof parsedGameId === 'number' && Number.isFinite(parsedGameId)
+                        ? parsedGameId
+                        : undefined;
                     // console.log(`📄 User ${userId} requested profile`);
-                    const profile = await userController.getProfile({ userId, postgres: pg, store: { userId } });
+                    const profile = await userController.getProfile({
+                        userId,
+                        postgres: pg,
+                        store: { userId },
+                        gameId: requestedGameId
+                    });
                     // console.log(`📄 Lấy thông tin profile của user ${userId}:`, profile);
                     ws.send(JSON.stringify({ type: 'getProfileResult', payload: profile }));
                 } catch (err: any) {
                     ws.send(JSON.stringify({ type: 'error', error: err.message }));
                 }
                 break;
+            }
+            case 'getLogs': {
+                const payload = msg.payload ?? {};
+                const rawLimit = Number(payload.limit ?? 20);
+                const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 20;
+                const rawOffset = Number(payload.offset ?? payload.skip ?? 0);
+                const skip = Number.isFinite(rawOffset) ? Math.max(0, rawOffset) : 0;
+                const allowedSorts = new Set(['t.desc', 't.asc', 'win.desc', 'win.asc', 'bet.desc', 'bet.asc']);
+                const sort = typeof payload.sort === 'string' && allowedSorts.has(payload.sort)
+                    ? payload.sort
+                    : undefined;
+                const parseDate = (value: any) => {
+                    if (!value) return undefined;
+                    const d = new Date(value);
+                    return Number.isNaN(d.getTime()) ? undefined : d;
+                };
+                try {
+                    const logs = await logic.getUserLogs(userId, {
+                        limit,
+                        skip,
+                        sort,
+                        dateFrom: parseDate(payload.dateFrom) ?? undefined,
+                        dateTo: parseDate(payload.dateTo) ?? undefined,
+                    });
+                    ws.send(JSON.stringify({
+                        type: 'getLogsResult',
+                        payload: {
+                            success: true,
+                            logs,
+                        }
+                    }));
+                } catch (err: any) {
+                    ws.send(JSON.stringify({
+                        type: 'getLogsResult',
+                        payload: {
+                            success: false,
+                            error: err.message ?? 'Không thể lấy log',
+                        }
+                    }));
+                }
+                break;
+            }
             default:
                 ws.send(JSON.stringify({ type: 'error', error: 'Unknown action' }));
         }

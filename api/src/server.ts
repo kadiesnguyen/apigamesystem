@@ -318,6 +318,119 @@ app.get('/api/games',
     }
 );
 
+app.post('/api/games',
+    authGuard(async ({ body }) => {
+        const payload = body as {
+            id: number;
+            code: string;
+            name: string;
+            category: 'slot' | 'table' | 'lottery';
+            rtp: number;
+            volatility: 'low' | 'medium' | 'high';
+            status: 'active' | 'inactive' | 'draft';
+            iconUrl?: string | null;
+            descShort?: string | null;
+            config?: Record<string, any>;
+            partners?: Array<{
+                partnerId: number;
+                enabled?: boolean;
+                rtp_override?: number;
+                sort_order?: number;
+                config?: Record<string, any>;
+            }>;
+        };
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const created = await client.query(
+                `INSERT INTO games (id, code, name, category, rtp, volatility, status, icon_url, desc_short, config)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                 RETURNING id, code, name, category, rtp, volatility, status, icon_url, desc_short, config, updated_at`,
+                [
+                    payload.id,
+                    payload.code,
+                    payload.name,
+                    payload.category,
+                    payload.rtp,
+                    payload.volatility,
+                    payload.status,
+                    payload.iconUrl ?? null,
+                    payload.descShort ?? null,
+                    payload.config ?? {}
+                ]
+            );
+
+            const game = created.rows[0];
+            const partnerPayload = Array.isArray(payload.partners) ? payload.partners : [];
+
+            for (const partner of partnerPayload) {
+                await client.query(
+                    `INSERT INTO partner_games (partner_id, game_id, enabled, rtp_override, sort_order, config, updated_at)
+                     VALUES ($1,$2,$3,$4,$5,$6, now())
+                     ON CONFLICT (partner_id, game_id) DO UPDATE
+                     SET enabled = EXCLUDED.enabled,
+                         rtp_override = EXCLUDED.rtp_override,
+                         sort_order = EXCLUDED.sort_order,
+                         config = EXCLUDED.config,
+                         updated_at = now()`,
+                    [
+                        partner.partnerId,
+                        game.id,
+                        partner.enabled ?? true,
+                        partner.rtp_override ?? null,
+                        partner.sort_order ?? 0,
+                        partner.config ?? {}
+                    ]
+                );
+            }
+
+            await client.query('COMMIT');
+
+            // warm config caches for base + partner overrides
+            await rebuildEffAndBump(game.id, 0);
+            for (const partner of partnerPayload) {
+                await rebuildEffAndBump(game.id, partner.partnerId);
+            }
+
+            return new Response(JSON.stringify({ ok: true, game }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (err: any) {
+            await client.query('ROLLBACK');
+            if (err?.code === '23505') {
+                return new Response('Game id hoặc code đã tồn tại', { status: 409 });
+            }
+            if (err?.code === '23503') {
+                return new Response('Partner không tồn tại', { status: 400 });
+            }
+            console.error('[createGame] error:', err);
+            return new Response('Không thể tạo game', { status: 500 });
+        } finally {
+            client.release();
+        }
+    }),
+    {
+        body: t.Object({
+            id: t.Number(),
+            code: t.String({ minLength: 1 }),
+            name: t.String({ minLength: 1 }),
+            category: t.Union([t.Literal('slot'), t.Literal('table'), t.Literal('lottery')]),
+            rtp: t.Number(),
+            volatility: t.Union([t.Literal('low'), t.Literal('medium'), t.Literal('high')]),
+            status: t.Union([t.Literal('active'), t.Literal('inactive'), t.Literal('draft')]),
+            iconUrl: t.Optional(t.String()),
+            descShort: t.Optional(t.String()),
+            config: t.Optional(t.Record(t.String(), t.Any())),
+            partners: t.Optional(t.Array(t.Object({
+                partnerId: t.Number(),
+                enabled: t.Optional(t.Boolean()),
+                rtp_override: t.Optional(t.Number()),
+                sort_order: t.Optional(t.Number()),
+                config: t.Optional(t.Record(t.String(), t.Any()))
+            })))
+        })
+    }
+);
+
 app.get('/api/games/:id', async ({ params }) => {
     const r = await pool.query(
         `SELECT id, code, name, category, rtp, volatility, status, icon_url, desc_short, updated_at
@@ -857,6 +970,137 @@ app.get(
         })
     }
 );
+
+// -------------------- DEBUG ROUTES --------------------
+// Các endpoint debug không cần auth, phục vụ playground kiểm tra dữ liệu
+
+app.get('/api/debug/partners', async () => {
+    const { rows } = await pool.query(`SELECT id, name, api_key, created_at FROM partners ORDER BY id`);
+    return new Response(JSON.stringify({ data: rows }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+app.get('/api/debug/players', async ({ query }) => {
+    const partnerId = (query as any).partnerId ? Number((query as any).partnerId) : null;
+    const username = (query as any).username?.toString().trim() ?? '';
+    const wh: string[] = [];
+    const p: any[] = [];
+    if (Number.isFinite(partnerId)) { p.push(partnerId); wh.push(`partner_id = $${p.length}`); }
+    if (username) { p.push(`%${username.toLowerCase()}%`); wh.push(`LOWER(username) LIKE $${p.length}`); }
+    const where = wh.length ? `WHERE ${wh.join(' AND ')}` : '';
+    const { rows } = await pool.query(`SELECT id, partner_id, username, active, created_at FROM players ${where} ORDER BY id LIMIT 100`, p);
+    return new Response(JSON.stringify({ data: rows }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+app.get('/api/debug/wallets', async ({ query }) => {
+    const playerId = (query as any).playerId ? Number((query as any).playerId) : null;
+    const gameId = (query as any).gameId ? Number((query as any).gameId) : null;
+    const wh: string[] = [];
+    const p: any[] = [];
+    if (Number.isFinite(playerId)) { p.push(playerId); wh.push(`player_id = $${p.length}`); }
+    if (Number.isFinite(gameId)) { p.push(gameId); wh.push(`game_id = $${p.length}`); }
+    const where = wh.length ? `WHERE ${wh.join(' AND ')}` : '';
+    const { rows } = await pool.query(
+        `SELECT id, player_id, game_id, username, currency, balance, locked_balance, free_spins, active, created_at
+         FROM player_accounts ${where} ORDER BY id LIMIT 200`, p);
+    return new Response(JSON.stringify({ data: rows }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+app.get('/api/debug/wallet/:id', async ({ params }) => {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) return new Response('Bad id', { status: 400 });
+    const { rows } = await pool.query(
+        `SELECT id, player_id, game_id, username, currency, balance, locked_balance, free_spins, active, created_at
+         FROM player_accounts WHERE id = $1`, [id]);
+    if (!rows.length) return new Response('Not found', { status: 404 });
+    return new Response(JSON.stringify({ data: rows[0] }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+// Chi tiết player + tất cả wallets của player đó
+app.get('/api/debug/player/:id', async ({ params }) => {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) return new Response('Bad id', { status: 400 });
+    const playerRes = await pool.query(
+        `SELECT id, partner_id, username, active, created_at FROM players WHERE id = $1`, [id]);
+    if (!playerRes.rows.length) return new Response('Player not found', { status: 404 });
+    const walletsRes = await pool.query(
+        `SELECT id AS account_id, player_id, game_id, username, currency, balance, locked_balance, free_spins, active, created_at
+         FROM player_accounts WHERE player_id = $1 ORDER BY game_id`, [id]);
+    return new Response(JSON.stringify({
+        player: playerRes.rows[0],
+        wallets: walletsRes.rows
+    }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+// Tạo wallet mới cho player
+app.post('/api/debug/wallet', async ({ body }) => {
+    const { playerId, gameId, username, currency, balance } = body as {
+        playerId: number;
+        gameId: number;
+        username?: string;
+        currency?: string;
+        balance?: number;
+    };
+    
+    if (!Number.isFinite(playerId) || !Number.isFinite(gameId)) {
+        return new Response('playerId và gameId là bắt buộc', { status: 400 });
+    }
+    
+    // Kiểm tra player tồn tại
+    const playerCheck = await pool.query(`SELECT id, username FROM players WHERE id = $1`, [playerId]);
+    if (!playerCheck.rows.length) {
+        return new Response('Player không tồn tại', { status: 404 });
+    }
+    
+    // Kiểm tra wallet đã tồn tại chưa
+    const existCheck = await pool.query(
+        `SELECT id FROM player_accounts WHERE player_id = $1 AND game_id = $2`, [playerId, gameId]);
+    if (existCheck.rows.length) {
+        return new Response(`Wallet cho player ${playerId} game ${gameId} đã tồn tại (ID: ${existCheck.rows[0].id})`, { status: 409 });
+    }
+    
+    const playerUsername = playerCheck.rows[0].username;
+    const walletUsername = username || playerUsername;
+    const walletCurrency = currency || 'VND';
+    const initialBalance = balance ?? 0;
+    
+    const result = await pool.query(
+        `INSERT INTO player_accounts (player_id, game_id, username, currency, balance, locked_balance, free_spins, active)
+         VALUES ($1, $2, $3, $4, $5, 0, 0, true)
+         RETURNING id, player_id, game_id, username, currency, balance`,
+        [playerId, gameId, walletUsername, walletCurrency, initialBalance]
+    );
+    
+    console.log(`✅ Tạo wallet mới: player=${playerId}, game=${gameId}, id=${result.rows[0].id}`);
+    return new Response(JSON.stringify({ ok: true, wallet: result.rows[0] }), { headers: { 'Content-Type': 'application/json' } });
+});
+
+// Xóa wallet theo account ID
+app.delete('/api/debug/wallet/:id', async ({ params }) => {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) return new Response('Bad id', { status: 400 });
+    
+    // Kiểm tra wallet tồn tại
+    const check = await pool.query(`SELECT id, balance, locked_balance FROM player_accounts WHERE id = $1`, [id]);
+    if (!check.rows.length) return new Response('Wallet not found', { status: 404 });
+    
+    const wallet = check.rows[0];
+    const balance = parseFloat(wallet.balance) || 0;
+    const locked = parseFloat(wallet.locked_balance) || 0;
+    
+    // Cảnh báo nếu còn tiền
+    if (balance > 0 || locked > 0) {
+        console.warn(`⚠️ Xóa wallet #${id} còn balance=${balance}, locked=${locked}`);
+    }
+    
+    // Xóa các bản ghi liên quan trong account_ledger trước (nếu có foreign key)
+    await pool.query(`DELETE FROM account_ledger WHERE account_id = $1`, [id]);
+    
+    // Xóa wallet
+    await pool.query(`DELETE FROM player_accounts WHERE id = $1`, [id]);
+    
+    console.log(`🗑️ Đã xóa wallet #${id}`);
+    return new Response(JSON.stringify({ ok: true, deleted: id }), { headers: { 'Content-Type': 'application/json' } });
+});
 
 await connectMongo(); // đảm bảo Mongo sẵn sàng trước khi nhận request
 console.log('✅ Mongo ready');

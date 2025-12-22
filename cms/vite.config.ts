@@ -10,7 +10,7 @@ export default ({ mode }) => {
     plugins: [react(), tsconfigPaths()],
     build: {
 
-      outDir: 'dist5',
+      outDir: 'dist',
     },
     server: {
       proxy: {

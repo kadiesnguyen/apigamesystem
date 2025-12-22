@@ -1,7 +1,8 @@
 import { MongoClient, Db } from 'mongodb';
+import { env } from './env';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = process.env.MONGO_DB || 'partner_system';
+const MONGO_URI = env.mongoUri || 'mongodb://localhost:27017';
+const DB_NAME = process.env.MONGO_DB || env.mongoDbName || 'logs';
 
 const client = new MongoClient(MONGO_URI);
 

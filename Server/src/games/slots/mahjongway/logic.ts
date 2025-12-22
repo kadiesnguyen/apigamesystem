@@ -1,11 +1,11 @@
-// src/games/slots/superace/SuperAceLogic.ts
+// src/games/slots/mahjongway/MahjongWayLogic.ts
 import type { Pool } from 'pg';
 import type { Db, Collection } from 'mongodb';
 import { GridModel, type StepRoundPayload, type CopyEvent } from './gridmodel';
-import { SuperAceConfig } from './config';
+import { MahjongWayConfig } from './config';
 import { UserBalanceService } from '../../services/UserBalanceService';
 import { ConfigManager } from '../../../config/ConfigManager';
-import type { SuperAceRuntime } from './adapter';
+import type { MahjongWayRuntime } from './adapter';
 import {
     GameLogService,
     type GameLogQuery,
@@ -21,7 +21,7 @@ export interface SpinResult {
     usingFreeSpin: boolean;
 }
 
-export class SuperAceLogic {
+export class MahjongWayLogic {
     private spinsCol: Collection;
     private gameLogService: GameLogService;
 
@@ -34,9 +34,9 @@ export class SuperAceLogic {
     async spin(userId: number, bet: number): Promise<any> {
         const balanceService = new UserBalanceService(this.db);
         // console.log(`🌀 User ${userId} spins with bet=${bet}`);
-        // console.log(userId, SuperAceConfig.GameId)
+        // console.log(userId, MahjongWayConfig.GameId)
         const res = await this.db.query<{ free_spins: number }>(
-            `SELECT free_spins FROM player_accounts WHERE player_id = $1 AND game_id = $2`, [userId, SuperAceConfig.GameId]
+            `SELECT free_spins FROM player_accounts WHERE player_id = $1 AND game_id = $2`, [userId, MahjongWayConfig.GameId]
         );
 
         // ✅ VALIDATE INPUT
@@ -50,12 +50,12 @@ export class SuperAceLogic {
         let freeSpins = res.rows[0]?.free_spins ?? 0;
         // ✅ VALIDATE FREE SPINS
         if (freeSpins < 0) freeSpins = 0; // Không cho phép âm
-        
+
         const isFreeSpin = freeSpins > 0;
         // console.log(`🌀 User ${userId} spins with bet=${bet}, freeSpinsLeft=${freeSpins}`);
 
         // ✅ LẤY BALANCE TRƯỚC KHI SPIN (phục vụ hiển thị log)
-        let balanceBefore = await balanceService.getBalance(userId, Number(SuperAceConfig.GameId));
+        let balanceBefore = await balanceService.getBalance(userId, Number(MahjongWayConfig.GameId));
         if (!isFreeSpin) {
             // ✅ KIỂM TRA VÀ TRỪ TIỀN AN TOÀN
             if (balanceBefore < bet) {
@@ -66,7 +66,7 @@ export class SuperAceLogic {
             }
 
             // ✅ TRỪ TIỀN VÀ KIỂM TRA KẾT QUẢ
-            const deductSuccess = await balanceService.decreaseBalance(userId, Number(SuperAceConfig.GameId), bet);
+            const deductSuccess = await balanceService.decreaseBalance(userId, Number(MahjongWayConfig.GameId), bet);
             if (!deductSuccess) {
                 return {
                     success: false,
@@ -78,13 +78,13 @@ export class SuperAceLogic {
             const client = await this.db.connect();
             try {
                 await client.query('BEGIN');
-                
+
                 // Đọc giá trị hiện tại trong transaction
                 const currentRes = await client.query<{ free_spins: number }>(
                     `SELECT free_spins FROM player_accounts WHERE player_id = $1 AND game_id = $2 FOR UPDATE`,
-                    [userId, Number(SuperAceConfig.GameId)]
+                    [userId, Number(MahjongWayConfig.GameId)]
                 );
-                
+
                 const currentFreeSpins = currentRes.rows[0]?.free_spins ?? 0;
                 if (currentFreeSpins < 1) {
                     await client.query('ROLLBACK');
@@ -93,20 +93,20 @@ export class SuperAceLogic {
                         error: 'Không có free spins'
                     };
                 }
-                
+
                 // Trừ 1 và cập nhật
                 const updateResult = await client.query<{ free_spins: number }>(
                     `UPDATE player_accounts SET free_spins = free_spins - 1 
                      WHERE player_id = $1 AND game_id = $2 
                      RETURNING free_spins`,
-                    [userId, Number(SuperAceConfig.GameId)]
+                    [userId, Number(MahjongWayConfig.GameId)]
                 );
-                
+
                 await client.query('COMMIT');
-                
+
                 freeSpins = updateResult.rows[0].free_spins;
                 console.log(`🌀 Using FREE spin for user ${userId}: ${currentFreeSpins} -> ${freeSpins}`);
-                
+
             } catch (error) {
                 await client.query('ROLLBACK');
                 console.error('Free spin transaction failed:', error);
@@ -120,40 +120,38 @@ export class SuperAceLogic {
         }
 
         // --- LẤY RUNTIME CFG TỪ REDIS (partnerId mặc định 0) ---
-        const gameId = Number(SuperAceConfig.GameId);
+        const gameId = Number(MahjongWayConfig.GameId);
         const prof = await this.getProfile(userId, gameId);           // để lấy partnerId
         const partnerId = prof.partner_id ?? 0;
-        const { cfg, ver } = await ConfigManager.I.getConfigWithVer<SuperAceRuntime>(gameId, 0);
-        
+        const { cfg, ver } = await ConfigManager.I.getConfigWithVer<MahjongWayRuntime>(gameId, 0);
+
         console.log(`\n🔧 CONFIG LOADED FROM REDIS:`);
         console.log(`Game ID: ${gameId}`);
         console.log(`Config Version: ${ver}`);
         console.log(`Payout Table:`, cfg.payoutTable);
         console.log(`Scatter Chance: ${cfg.scatterChance}`);
         console.log(`Golden Chance: ${cfg.goldenChance}`);
-        console.log(`Red Wild Chance: ${cfg.redWildChance}`);
         console.log(`No Win Rate: ${cfg.noWinRate}`);
-        
+
         const model = new GridModel(
-            SuperAceConfig.Cols,
-            SuperAceConfig.Rows,
+            MahjongWayConfig.Cols,
+            MahjongWayConfig.Rows,
             cfg.payoutTable,
             cfg.scatterChance,
             cfg.goldenChance,
-            cfg.redWildChance,
             cfg.noWinRate
         );
 
         // Luôn dùng bet người chơi đã chọn để tính thưởng (free spin không trừ tiền)
         const spinBet = bet;
-        
+
         console.log(`\n🎰 SPIN PARAMETERS:`);
         console.log(`User ID: ${userId}`);
         console.log(`Bet: ${bet}`);
         console.log(`Spin Bet: ${spinBet}`);
         console.log(`Is Free Spin: ${isFreeSpin}`);
         console.log(`Free Spins Left: ${freeSpins}`);
-        
+
         // const { rounds, totalWin } = model.spinWithCascade(spinBet, isFreeSpin);
         const { rounds, totalWin } = model.spinWithCascadeAuthoritative(spinBet, isFreeSpin);
 
@@ -166,27 +164,30 @@ export class SuperAceLogic {
         // TÍNH FREE: CHỈ THƯỞNG LƯỢT, KHÔNG CHẠY BATCH
         let freeMeta: { triggered: boolean; awarded: number } = { triggered: false, awarded: 0 };
         if (scatters >= 3) {
-            const award = isFreeSpin ? 5 : 10;
+            const baseAward = MahjongWayConfig.FreeSpinAward ?? 0;
+            const extraAwardPerScatter = MahjongWayConfig.ExtraFreeSpinsPerScatter ?? 0;
+            const extraScatters = Math.max(0, scatters - 3);
+            const award = baseAward + extraScatters * extraAwardPerScatter;
             freeMeta = { triggered: true, awarded: award };
-            console.log(`🎯 Scatter bonus triggered! Awarding ${award} free spins to user ${userId}`);
-            
+            console.log(`🎯 Scatter bonus triggered! Awarding ${award} free spins (scatters=${scatters}) to user ${userId}`);
+
             // Cập nhật DB với transaction để tránh race condition
             const client = await this.db.connect();
             try {
                 await client.query('BEGIN');
-                
+
                 const upd = await client.query<{ free_spins: number }>(
                     `UPDATE player_accounts SET free_spins = free_spins + $1 
                      WHERE player_id = $2 AND game_id = $3 
                      RETURNING free_spins`,
-                    [award, userId, Number(SuperAceConfig.GameId)]
+                    [award, userId, Number(MahjongWayConfig.GameId)]
                 );
-                
+
                 await client.query('COMMIT');
-                
+
                 freeSpins = upd.rows[0]?.free_spins ?? freeSpins + award;
                 console.log(`✅ Free spins updated: ${freeSpins} total for user ${userId}`);
-                
+
             } catch (error) {
                 await client.query('ROLLBACK');
                 console.error('Scatter bonus transaction failed:', error);
@@ -202,20 +203,20 @@ export class SuperAceLogic {
 
         // nếu totalWin > 0 thì cộng tiền vào tài khoản
         if (totalWin > 0) {
-            await balanceService.increaseBalance(userId, Number(SuperAceConfig.GameId), totalWin);
+            await balanceService.increaseBalance(userId, Number(MahjongWayConfig.GameId), totalWin);
             console.log(`🎉 User ${userId} won ${totalWin} coins!`)
         }
 
         // Nếu đây là lượt free (đã trừ 1 đầu vòng), đồng bộ lại freeSpinsLeft qua DB (đã làm bằng RETURNING ở trên khi thưởng)
 
-        const balanceAfter = await balanceService.getBalance(userId, Number(SuperAceConfig.GameId));
+        const balanceAfter = await balanceService.getBalance(userId, Number(MahjongWayConfig.GameId));
 
         // --- GHI LOG TỐI GIẢN ---
         // console.log(mongoDb);
         try {
             await this.spinsCol.insertOne({
                 t: new Date(),
-                gid: Number(SuperAceConfig.GameId),
+                gid: Number(MahjongWayConfig.GameId),
                 pid: partnerId,
                 uid: userId,
                 bet,
@@ -234,47 +235,110 @@ export class SuperAceLogic {
         }
         // console.log(`📝 Ghi log spin cho user ${userId}: bet=${bet}, win=${totalWin}, freeSpinsLeft=${freeSpins}`);
         // ---- Transform rounds to lightweight client schema ----
-        type PackedCell = { i: number; t: 'n' | 'g' | 'w' | 's'; wt?: 'blue' | 'red' };
+        type PackedCell = { i: number; t: 'n' | 'g' | 'w' | 's'; wt?: 'blue' };
         const packCell = (cell: any): PackedCell => {
             if (!cell) return { i: -1, t: 'n' } as PackedCell;
             const t: 'n' | 'g' | 'w' | 's' = cell.isWild ? 'w' : (cell.isScatter ? 's' : (cell.isGolden ? 'g' : 'n'));
-            const out: PackedCell = { i: cell.idx, t };
+            // Client expects icon ids where 0=Wild, 1=Scatter, >=2 => sprite index offset by 2.
+            let iconId: number;
+            if (cell.isWild) {
+                iconId = 0;
+            } else if (cell.isScatter) {
+                iconId = 1;
+            } else if (typeof cell.idx === 'number' && cell.idx >= 0) {
+                iconId = cell.idx + 2;
+            } else {
+                iconId = -1;
+            }
+            const out: PackedCell = { i: iconId, t };
             if (t === 'w') out.wt = cell.wildType ?? 'blue';
             return out;
         };
-        const packGrid = (grid: any[][]): PackedCell[][] => grid.map(col => col.map(packCell));
+        const rowsVisible = MahjongWayConfig.Rows ?? 0;
+        const rowsAbove = MahjongWayConfig.RowsAbove ?? 0;
+        const toClientRow = (engineRow: number): number => {
+            if (rowsVisible <= 0) return engineRow;
+            return rowsVisible - 1 - engineRow;
+        };
+        const packVisibleGrid = (grid: any[][]): PackedCell[][] =>
+            (grid ?? []).map(col => {
+                const safeCol = col ?? [];
+                const topDown = [...safeCol].reverse();
+                return topDown.map(packCell);
+            });
+        const packAboveGrid = (grid: any[][]): PackedCell[][] =>
+            (grid ?? []).map(col => {
+                const safeCol = col ?? [];
+                const limit = Math.max(0, rowsAbove);
+                const effective = limit > 0 ? safeCol.slice(0, limit) : [];
+                return effective.map(packCell);
+            });
 
+        const fallbackGrid = model.getVisibleGridSnapshot();
+        const fallbackAbove = model.getAboveBufferSnapshot();
+        // Chuyển dữ liệu nội bộ của GridModel thành schema nhẹ cho client.
         const transformedRounds = (rounds.length > 0 ? rounds : [{
             index: 0,
-            grid: model.data,
+            grid: fallbackGrid,
+            aboveGrid: fallbackAbove,
             winCells: [],
+            clearedCells: [],
             stepWin: 0,
             multiplier: isFreeSpin ? 2 : 1,
             flipEvents: [],
             copyEvents: [],
-            nextGrid: model.data,
+            nextGrid: fallbackGrid,
+            nextAboveGrid: fallbackAbove,
             hasNext: false,
         }]).map((r) => {
-            // tách win thường vs wild dựa trên grid tại đầu step
-            const winNormal: { c: number; r: number }[] = [];
-            const winWild: { c: number; r: number; wildType: 'blue' | 'red' }[] = [];
-            for (const p of r.winCells || []) {
-                // Kiểm tra wild trong nextGrid (sau khi xử lý) thay vì grid (trước khi xử lý)
-                const cell = r.nextGrid?.[p.r]?.[p.c];
-                if (cell?.isWild) {
-                    winWild.push({ c: p.c, r: p.r, wildType: (cell.wildType ?? 'blue') as 'blue' | 'red' });
-                } else {
-                    winNormal.push({ c: p.c, r: p.r });
-                }
+            // ⭐ Gom danh sách flip để biết ô nào đã thành Wild sau step này.
+            const flipMap = new Map<string, { wildType: 'blue' }>();
+            for (const ev of r.flipEvents || []) {
+                flipMap.set(`${ev.c},${ev.r}`, { wildType: ev.wildType });
             }
-            const flips = (r.flipEvents || []).map(ev => ({ c: ev.c, r: ev.r, wildType: ev.wildType }));
-            const copies = (r.copyEvents || []).map((ev: CopyEvent) => ({ 
-                c: ev.c, 
-                r: ev.r, 
-                sourcePos: ev.sourcePos, 
-                wildType: ev.wildType 
+
+            // 🔎 Helper: phân loại danh sách tọa độ thành normal/wild dựa trên grid trước xử lý + sự kiện flip.
+            const classifyPositions = (positions: { c: number; r: number }[]) => {
+                const normal: { c: number; r: number }[] = [];
+                const wild: { c: number; r: number; wildType: 'blue' }[] = [];
+                for (const { c, r: row } of positions) {
+                    const key = `${c},${row}`;
+                    const startCell = r.grid?.[c]?.[row];
+                    const flipped = flipMap.get(key);
+                    const alreadyWild = Boolean(startCell?.isWild);
+                    const clientRow = toClientRow(row);
+                    if (alreadyWild || flipped) {
+                        wild.push({
+                            c,
+                            r: clientRow,
+                            wildType: (flipped?.wildType ?? startCell?.wildType ?? 'blue') as 'blue'
+                        });
+                    } else {
+                        normal.push({ c, r: clientRow });
+                    }
+                }
+                return { normal, wild };
+            };
+
+            // 👀 Win hiển thị = toàn bộ ô thắng trước khi clear (bao gồm golden chưa nổ).
+            const winData = classifyPositions(r.winCells || []);
+            // 🧹 Clear = tập ô thực sự bị loại khỏi lưới (để client tính số symbol cần rơi xuống).
+            const clearData = classifyPositions(r.clearedCells || []);
+            const flips = (r.flipEvents || []).map(ev => ({
+                c: ev.c,
+                r: toClientRow(ev.r),
+                wildType: ev.wildType
             }));
-            
+            const copies = (r.copyEvents || []).map((ev: CopyEvent) => ({
+                c: ev.c,
+                r: toClientRow(ev.r),
+                sourcePos: {
+                    c: ev.sourcePos.c,
+                    r: toClientRow(ev.sourcePos.r)
+                },
+                wildType: ev.wildType
+            }));
+
             // Debug: In copy events data
             if (copies.length > 0) {
                 console.log(`🎭 Round ${r.index} - Copy Events Data:`);
@@ -286,13 +350,16 @@ export class SuperAceLogic {
             const lastRound = r.hasNext ? undefined : { keepWild: true, clearOnlyNormals: true, dropNextGridThenEnd: true };
             return {
                 index: r.index,
-                grid: packGrid(r.grid),
-                win: { normal: winNormal, wild: winWild },
+                grid: packVisibleGrid(r.grid),
+                above: packAboveGrid(r.aboveGrid ?? []),
+                win: winData,
+                clear: clearData,
                 flips,
                 copies,
                 stepWin: r.stepWin,
                 multiplier: r.multiplier,
-                nextGrid: packGrid(r.nextGrid),
+                nextGrid: packVisibleGrid(r.nextGrid),
+                nextAbove: packAboveGrid(r.nextAboveGrid ?? []),
                 hasNext: r.hasNext,
                 ...(lastRound ? { lastRound } : {}),
             };
@@ -316,7 +383,7 @@ export class SuperAceLogic {
     ): Promise<SpinLogView[]> {
         return this.gameLogService.fetchLogs({
             userId,
-            gameId: Number(SuperAceConfig.GameId),
+            gameId: Number(MahjongWayConfig.GameId),
             ...options,
         });
     }

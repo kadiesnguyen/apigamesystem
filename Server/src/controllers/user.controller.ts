@@ -13,6 +13,7 @@ type Ctx = {
     body: any;
     request: any;
     userId?: number;
+    gameId?: number;
 };
 
 function parsePgError(e: any) {
@@ -282,10 +283,18 @@ export const userController = {
     },
 
     // GET /auth/profile  — lấy thông tin từ bảng players
-    async getProfile({ postgres, store, userId }: Ctx) {
+    async getProfile({ postgres, store, userId, gameId }: Ctx) {
         if (!userId) return errorResponse('User ID không hợp lệ', 400);
-        const gameId = await this.getGameId(userId, postgres);
-        // console.log(`Lấy thông tin profile cho userId=${userId}, gameId=${gameId}`);
+        let targetGameId = typeof gameId === 'number' && Number.isFinite(gameId) && gameId > 0
+            ? gameId
+            : null;
+
+        if (!targetGameId) {
+            targetGameId = await this.getGameId(userId, postgres);
+        }
+
+        if (!targetGameId) return errorResponse('Game ID không hợp lệ', 400);
+        // console.log(`Lấy thông tin profile cho userId=${userId}, gameId=${targetGameId}`);
 
         const user = await postgres.query(
             `SELECT id, username, partner_id, active
@@ -301,7 +310,7 @@ export const userController = {
          FROM player_accounts
          WHERE player_id = $1 AND game_id = $2
          ORDER BY game_id`,
-            [userId, gameId]
+            [userId, targetGameId]
         );
 
         return successResponse({

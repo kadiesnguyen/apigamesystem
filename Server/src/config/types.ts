@@ -1,5 +1,5 @@
 // GameId trong registry dùng number; GameManager của bạn đang là string → sẽ convert.
-export type GameIdNum = 1001;
+export type GameIdNum = 1001 | 1002 | 1003;
 export type GameIdStr = string;
 
 export interface GameAdapter<RuntimeCfg = any> {

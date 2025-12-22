@@ -10,12 +10,14 @@ import {
 import background from "@/assets/images/BG.webp";
 import { useAuth } from "@/store/auth";
 import { http, setAccessToken } from "@/lib/http";
+import { useNavigate } from "react-router-dom";
 const { Title, Text } = Typography;
 import AppMessage, { AppMessageRef } from "@/components/AppMessage";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuth();
+  const navigate = useNavigate();
 
   const msgRef = useRef<AppMessageRef>(null);
 
@@ -24,10 +26,8 @@ export default function LoginPage() {
     msgRef.current?.clear();
 
     try {
-      const res = await fetch(`/api/auth/login`, {
+      const res = await http(`/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           username: values.username?.trim(),
           password: values.password,
@@ -50,7 +50,7 @@ export default function LoginPage() {
       setAccessToken(accessToken);
       setAuth({ token: accessToken });
       msgRef.current?.showSuccess("Đăng nhập thành công!");
-      setTimeout(() => (window.location.href = "/dashboard"), 500);
+      setTimeout(() => navigate("/dashboard", { replace: true }), 500);
     } catch (e) {
       msgRef.current?.showError("Không thể kết nối máy chủ.");
     } finally {

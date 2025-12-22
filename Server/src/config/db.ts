@@ -7,7 +7,7 @@ const password = process.env.POSTGRES_PASSWORD || 'defaultpassword';
 const user = process.env.POSTGRES_USER || 'defaultuser';
 const database = process.env.POSTGRES_DB || 'defaultdb';
 const host = process.env.POSTGRES_HOST || 'localhost';
-const port = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5433;
+const port = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5432;
 
 const pool = new Pool({
   // postgres://postgres:A1234@localhost:5432/game';

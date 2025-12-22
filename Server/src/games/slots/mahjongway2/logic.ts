@@ -6,6 +6,11 @@ import { MahjongWay2Config } from './config';
 import { UserBalanceService } from '../../services/UserBalanceService';
 import { ConfigManager } from '../../../config/ConfigManager';
 import type { MahjongWay2Runtime } from './adapter';
+import {
+    GameLogService,
+    type GameLogQuery,
+    type SpinLogView,
+} from '../../../services/GameLogService';
 
 export interface SpinResult {
     grid: any[][];
@@ -18,21 +23,19 @@ export interface SpinResult {
 
 export class MahjongWay2Logic {
     private spinsCol: Collection;
+    private gameLogService: GameLogService;
 
     constructor(private db: Pool, private mongoDb: Db) {
         this.spinsCol = this.mongoDb.collection('logs.game');
+        this.gameLogService = new GameLogService(this.mongoDb);
     }
 
-    /** Thực hiện 1 lượt spin cho user */
     async spin(userId: number, bet: number): Promise<any> {
         const balanceService = new UserBalanceService(this.db);
-        // console.log(`🌀 User ${userId} spins with bet=${bet}`);
-        // console.log(userId, MahjongWay2Config.GameId)
         const res = await this.db.query<{ free_spins: number }>(
             `SELECT free_spins FROM player_accounts WHERE player_id = $1 AND game_id = $2`, [userId, MahjongWay2Config.GameId]
         );
 
-        // ✅ VALIDATE INPUT
         if (!Number.isFinite(bet) || bet <= 0 || bet > 10000) {
             return {
                 success: false,
@@ -41,43 +44,36 @@ export class MahjongWay2Logic {
         }
 
         let freeSpins = res.rows[0]?.free_spins ?? 0;
-        // ✅ VALIDATE FREE SPINS
-        if (freeSpins < 0) freeSpins = 0; // Không cho phép âm
-        
-        const isFreeSpin = freeSpins > 0;
-        // console.log(`🌀 User ${userId} spins with bet=${bet}, freeSpinsLeft=${freeSpins}`);
+        if (freeSpins < 0) freeSpins = 0;
 
-        // ✅ LẤY BALANCE TRƯỚC KHI SPIN (phục vụ hiển thị log)
+        const isFreeSpin = freeSpins > 0;
+
         let balanceBefore = await balanceService.getBalance(userId, Number(MahjongWay2Config.GameId));
         if (!isFreeSpin) {
-            // ✅ KIỂM TRA VÀ TRỪ TIỀN AN TOÀN
             if (balanceBefore < bet) {
                 return {
                     success: false,
-                    error: '01' // không đủ tiền
+                    error: '01'
                 };
             }
 
-            // ✅ TRỪ TIỀN VÀ KIỂM TRA KẾT QUẢ
             const deductSuccess = await balanceService.decreaseBalance(userId, Number(MahjongWay2Config.GameId), bet);
             if (!deductSuccess) {
                 return {
                     success: false,
-                    error: '01' // không đủ tiền
+                    error: '01'
                 };
             }
         } else {
-            // ✅ TRỪ FREE SPINS VỚI TRANSACTION ĐỂ TRÁNH RACE CONDITION
             const client = await this.db.connect();
             try {
                 await client.query('BEGIN');
-                
-                // Đọc giá trị hiện tại trong transaction
+
                 const currentRes = await client.query<{ free_spins: number }>(
                     `SELECT free_spins FROM player_accounts WHERE player_id = $1 AND game_id = $2 FOR UPDATE`,
                     [userId, Number(MahjongWay2Config.GameId)]
                 );
-                
+
                 const currentFreeSpins = currentRes.rows[0]?.free_spins ?? 0;
                 if (currentFreeSpins < 1) {
                     await client.query('ROLLBACK');
@@ -86,20 +82,19 @@ export class MahjongWay2Logic {
                         error: 'Không có free spins'
                     };
                 }
-                
-                // Trừ 1 và cập nhật
+
                 const updateResult = await client.query<{ free_spins: number }>(
                     `UPDATE player_accounts SET free_spins = free_spins - 1 
                      WHERE player_id = $1 AND game_id = $2 
                      RETURNING free_spins`,
                     [userId, Number(MahjongWay2Config.GameId)]
                 );
-                
+
                 await client.query('COMMIT');
-                
+
                 freeSpins = updateResult.rows[0].free_spins;
                 console.log(`🌀 Using FREE spin for user ${userId}: ${currentFreeSpins} -> ${freeSpins}`);
-                
+
             } catch (error) {
                 await client.query('ROLLBACK');
                 console.error('Free spin transaction failed:', error);
@@ -112,77 +107,73 @@ export class MahjongWay2Logic {
             }
         }
 
-        // --- LẤY RUNTIME CFG TỪ REDIS (partnerId mặc định 0) ---
         const gameId = Number(MahjongWay2Config.GameId);
-        const prof = await this.getProfile(userId, gameId);           // để lấy partnerId
+        const prof = await this.getProfile(userId, gameId);
+        const partnerId = prof.partner_id ?? 0;
         const { cfg, ver } = await ConfigManager.I.getConfigWithVer<MahjongWay2Runtime>(gameId, 0);
-        
+
         console.log(`\n🔧 CONFIG LOADED FROM REDIS:`);
         console.log(`Game ID: ${gameId}`);
         console.log(`Config Version: ${ver}`);
         console.log(`Payout Table:`, cfg.payoutTable);
         console.log(`Scatter Chance: ${cfg.scatterChance}`);
         console.log(`Golden Chance: ${cfg.goldenChance}`);
-        console.log(`Red Wild Chance: ${cfg.redWildChance}`);
         console.log(`No Win Rate: ${cfg.noWinRate}`);
-        
+
         const model = new GridModel(
             MahjongWay2Config.Cols,
             MahjongWay2Config.Rows,
             cfg.payoutTable,
             cfg.scatterChance,
             cfg.goldenChance,
-            cfg.redWildChance,
             cfg.noWinRate
         );
 
-        // Luôn dùng bet người chơi đã chọn để tính thưởng (free spin không trừ tiền)
         const spinBet = bet;
-        
+
         console.log(`\n🎰 SPIN PARAMETERS:`);
         console.log(`User ID: ${userId}`);
         console.log(`Bet: ${bet}`);
         console.log(`Spin Bet: ${spinBet}`);
         console.log(`Is Free Spin: ${isFreeSpin}`);
         console.log(`Free Spins Left: ${freeSpins}`);
-        
-        // const { rounds, totalWin } = model.spinWithCascade(spinBet, isFreeSpin);
+
         const { rounds, totalWin } = model.spinWithCascadeAuthoritative(spinBet, isFreeSpin);
 
-        // Tính scatter bonus - đếm từ grid cuối cùng vì scatter không bị triệt tiêu và có thể xuất hiện mới trong cascade
         const firstGrid = rounds.at(0)?.grid || model.data;
         const lastGrid = rounds.at(-1)?.grid || model.data;
         const scatters = lastGrid.flat().filter(c => c.isScatter).length;
         const initialScatters = firstGrid.flat().filter(c => c.isScatter).length;
         console.log(`User ${userId} spun: ${initialScatters} initial scatters → ${scatters} final scatters (after cascade)`);
-        // TÍNH FREE: CHỈ THƯỞNG LƯỢT, KHÔNG CHẠY BATCH
+
         let freeMeta: { triggered: boolean; awarded: number } = { triggered: false, awarded: 0 };
         if (scatters >= 3) {
-            const award = isFreeSpin ? 5 : 10;
+            const baseAward = MahjongWay2Config.FreeSpinAward ?? 0;
+            const extraAwardPerScatter = MahjongWay2Config.ExtraFreeSpinsPerScatter ?? 0;
+            const extraScatters = Math.max(0, scatters - 3);
+            const award = baseAward + extraScatters * extraAwardPerScatter;
             freeMeta = { triggered: true, awarded: award };
-            console.log(`🎯 Scatter bonus triggered! Awarding ${award} free spins to user ${userId}`);
-            
-            // Cập nhật DB với transaction để tránh race condition
+            console.log(`🎯 Scatter bonus triggered! Awarding ${award} free spins (scatters=${scatters}) to user ${userId}`);
+
             const client = await this.db.connect();
             try {
                 await client.query('BEGIN');
-                
+
                 const upd = await client.query<{ free_spins: number }>(
                     `UPDATE player_accounts SET free_spins = free_spins + $1 
                      WHERE player_id = $2 AND game_id = $3 
                      RETURNING free_spins`,
                     [award, userId, Number(MahjongWay2Config.GameId)]
                 );
-                
+
                 await client.query('COMMIT');
-                
+
                 freeSpins = upd.rows[0]?.free_spins ?? freeSpins + award;
                 console.log(`✅ Free spins updated: ${freeSpins} total for user ${userId}`);
-                
+
             } catch (error) {
                 await client.query('ROLLBACK');
                 console.error('Scatter bonus transaction failed:', error);
-                // Fallback: cộng vào biến local
                 freeSpins += award;
                 console.log(`⚠️ Fallback: Free spins updated locally: ${freeSpins}`);
             } finally {
@@ -192,82 +183,130 @@ export class MahjongWay2Logic {
             console.log(`❌ Not enough scatters for bonus: ${scatters}/3`);
         }
 
-        // nếu totalWin > 0 thì cộng tiền vào tài khoản
         if (totalWin > 0) {
             await balanceService.increaseBalance(userId, Number(MahjongWay2Config.GameId), totalWin);
             console.log(`🎉 User ${userId} won ${totalWin} coins!`)
         }
 
-        // Nếu đây là lượt free (đã trừ 1 đầu vòng), đồng bộ lại freeSpinsLeft qua DB (đã làm bằng RETURNING ở trên khi thưởng)
-
         const balanceAfter = await balanceService.getBalance(userId, Number(MahjongWay2Config.GameId));
 
-        // --- GHI LOG TỐI GIẢN ---
-        // console.log(mongoDb);
         try {
             await this.spinsCol.insertOne({
                 t: new Date(),
                 gid: Number(MahjongWay2Config.GameId),
-                pid: (await this.getProfile(userId, Number(MahjongWay2Config.GameId))).partner_id ?? 0,
+                pid: partnerId,
                 uid: userId,
                 bet,
                 username: prof.username,
                 win: totalWin,
                 free: isFreeSpin,
                 fsl: freeSpins,
-                cfgv: ver,             // từ ConfigManager.I.getConfigWithVer(...)
-                bal_b: balanceBefore,  // trước khi trừ bet (kể cả free spin)
-                bal_a: balanceAfter    // sau khi cộng win (nếu có)
+                cfgv: ver,
+                bal_b: balanceBefore,
+                bal_a: balanceAfter
             });
-            // (tùy chọn) log id để confirm
-            // console.log('[spin-log] inserted', ins.insertedId);
         } catch (e) {
             console.error('[spin-log] insert failed:', e);
         }
-        // console.log(`📝 Ghi log spin cho user ${userId}: bet=${bet}, win=${totalWin}, freeSpinsLeft=${freeSpins}`);
-        // ---- Transform rounds to lightweight client schema ----
-        type PackedCell = { i: number; t: 'n' | 'g' | 'w' | 's'; wt?: 'blue' | 'red' };
+
+        type PackedCell = { i: number; t: 'n' | 'g' | 'w' | 's'; wt?: 'blue' };
         const packCell = (cell: any): PackedCell => {
             if (!cell) return { i: -1, t: 'n' } as PackedCell;
             const t: 'n' | 'g' | 'w' | 's' = cell.isWild ? 'w' : (cell.isScatter ? 's' : (cell.isGolden ? 'g' : 'n'));
-            const out: PackedCell = { i: cell.idx, t };
+            let iconId: number;
+            if (cell.isWild) {
+                iconId = 0;
+            } else if (cell.isScatter) {
+                iconId = 1;
+            } else if (typeof cell.idx === 'number' && cell.idx >= 0) {
+                iconId = cell.idx + 2;
+            } else {
+                iconId = -1;
+            }
+            const out: PackedCell = { i: iconId, t };
             if (t === 'w') out.wt = cell.wildType ?? 'blue';
             return out;
         };
-        const packGrid = (grid: any[][]): PackedCell[][] => grid.map(col => col.map(packCell));
+        const rowsVisible = MahjongWay2Config.Rows ?? 0;
+        const rowsAbove = MahjongWay2Config.RowsAbove ?? 0;
+        const toClientRow = (engineRow: number): number => {
+            if (rowsVisible <= 0) return engineRow;
+            return rowsVisible - 1 - engineRow;
+        };
+        const packVisibleGrid = (grid: any[][]): PackedCell[][] =>
+            (grid ?? []).map(col => {
+                const safeCol = col ?? [];
+                const topDown = [...safeCol].reverse();
+                return topDown.map(packCell);
+            });
+        const packAboveGrid = (grid: any[][]): PackedCell[][] =>
+            (grid ?? []).map(col => {
+                const safeCol = col ?? [];
+                const limit = Math.max(0, rowsAbove);
+                const effective = limit > 0 ? safeCol.slice(0, limit) : [];
+                return effective.map(packCell);
+            });
 
+        const fallbackGrid = model.getVisibleGridSnapshot();
+        const fallbackAbove = model.getAboveBufferSnapshot();
         const transformedRounds = (rounds.length > 0 ? rounds : [{
             index: 0,
-            grid: model.data,
+            grid: fallbackGrid,
+            aboveGrid: fallbackAbove,
             winCells: [],
+            clearedCells: [],
             stepWin: 0,
             multiplier: isFreeSpin ? 2 : 1,
             flipEvents: [],
             copyEvents: [],
-            nextGrid: model.data,
+            nextGrid: fallbackGrid,
+            nextAboveGrid: fallbackAbove,
             hasNext: false,
         }]).map((r) => {
-            // tách win thường vs wild dựa trên grid tại đầu step
-            const winNormal: { c: number; r: number }[] = [];
-            const winWild: { c: number; r: number; wildType: 'blue' | 'red' }[] = [];
-            for (const p of r.winCells || []) {
-                // Kiểm tra wild trong nextGrid (sau khi xử lý) thay vì grid (trước khi xử lý)
-                const cell = r.nextGrid?.[p.r]?.[p.c];
-                if (cell?.isWild) {
-                    winWild.push({ c: p.c, r: p.r, wildType: (cell.wildType ?? 'blue') as 'blue' | 'red' });
-                } else {
-                    winNormal.push({ c: p.c, r: p.r });
-                }
+            const flipMap = new Map<string, { wildType: 'blue' }>();
+            for (const ev of r.flipEvents || []) {
+                flipMap.set(`${ev.c},${ev.r}`, { wildType: ev.wildType });
             }
-            const flips = (r.flipEvents || []).map(ev => ({ c: ev.c, r: ev.r, wildType: ev.wildType }));
-            const copies = (r.copyEvents || []).map((ev: CopyEvent) => ({ 
-                c: ev.c, 
-                r: ev.r, 
-                sourcePos: ev.sourcePos, 
-                wildType: ev.wildType 
+
+            const classifyPositions = (positions: { c: number; r: number }[]) => {
+                const normal: { c: number; r: number }[] = [];
+                const wild: { c: number; r: number; wildType: 'blue' }[] = [];
+                for (const { c, r: row } of positions) {
+                    const key = `${c},${row}`;
+                    const startCell = r.grid?.[c]?.[row];
+                    const flipped = flipMap.get(key);
+                    const alreadyWild = Boolean(startCell?.isWild);
+                    const clientRow = toClientRow(row);
+                    if (alreadyWild || flipped) {
+                        wild.push({
+                            c,
+                            r: clientRow,
+                            wildType: (flipped?.wildType ?? startCell?.wildType ?? 'blue') as 'blue'
+                        });
+                    } else {
+                        normal.push({ c, r: clientRow });
+                    }
+                }
+                return { normal, wild };
+            };
+
+            const winData = classifyPositions(r.winCells || []);
+            const clearData = classifyPositions(r.clearedCells || []);
+            const flips = (r.flipEvents || []).map(ev => ({
+                c: ev.c,
+                r: toClientRow(ev.r),
+                wildType: ev.wildType
             }));
-            
-            // Debug: In copy events data
+            const copies = (r.copyEvents || []).map((ev: CopyEvent) => ({
+                c: ev.c,
+                r: toClientRow(ev.r),
+                sourcePos: {
+                    c: ev.sourcePos.c,
+                    r: toClientRow(ev.sourcePos.r)
+                },
+                wildType: ev.wildType
+            }));
+
             if (copies.length > 0) {
                 console.log(`🎭 Round ${r.index} - Copy Events Data:`);
                 console.log(`   Count: ${copies.length}`);
@@ -278,19 +317,21 @@ export class MahjongWay2Logic {
             const lastRound = r.hasNext ? undefined : { keepWild: true, clearOnlyNormals: true, dropNextGridThenEnd: true };
             return {
                 index: r.index,
-                grid: packGrid(r.grid),
-                win: { normal: winNormal, wild: winWild },
+                grid: packVisibleGrid(r.grid),
+                above: packAboveGrid(r.aboveGrid ?? []),
+                win: winData,
+                clear: clearData,
                 flips,
                 copies,
                 stepWin: r.stepWin,
                 multiplier: r.multiplier,
-                nextGrid: packGrid(r.nextGrid),
+                nextGrid: packVisibleGrid(r.nextGrid),
+                nextAbove: packAboveGrid(r.nextAboveGrid ?? []),
                 hasNext: r.hasNext,
                 ...(lastRound ? { lastRound } : {}),
             };
         });
 
-        // Debug: Chỉ hiển thị thông tin cơ bản
         console.log(`\n📊 SPIN RESULT: Total Win: ${totalWin}, Rounds: ${transformedRounds.length}`);
 
         return {
@@ -298,20 +339,31 @@ export class MahjongWay2Logic {
             usingFreeSpin: isFreeSpin,
             freeSpinsLeft: freeSpins,
             totalWin,
-            free: freeMeta, // { triggered, awarded, total }
+            free: freeMeta,
             rounds: transformedRounds,
         };
     }
-    /** Lấy thông tin profile của user */
+
+    async getUserLogs(
+        userId: number,
+        options?: Pick<GameLogQuery, 'limit' | 'skip' | 'sort' | 'dateFrom' | 'dateTo' | 'partnerId'>
+    ): Promise<SpinLogView[]> {
+        return this.gameLogService.fetchLogs({
+            userId,
+            gameId: Number(MahjongWay2Config.GameId),
+            ...options,
+        });
+    }
+
     async getProfile(userId: number, gameId: number): Promise<any> {
         const res = await this.db.query(
             `SELECT player_id, username, partner_id, created_at FROM player_accounts WHERE player_id = $1 AND game_id = $2`,
             [userId, gameId]
         );
-        // console.log(`datanh: ${JSON.stringify(res.rows)}`);
         if (res.rowCount === 0) {
             throw new Error('Tài khoản không tồn tại');
         }
         return res.rows[0];
     }
 }
+
