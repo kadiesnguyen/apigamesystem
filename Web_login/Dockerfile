@@ -7,8 +7,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with fallback
+# Try npm ci first (faster), fallback to npm install if lockfile is out of sync
+RUN npm ci || npm install
 
 # Copy source code
 COPY . .
