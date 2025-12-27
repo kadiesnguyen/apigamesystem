@@ -123,25 +123,25 @@ pipeline {
                     }
                 }
                 
-                stage('Build Web Login') {
-                    steps {
-                        script {
-                            echo '🔨 Building Web Login service...'
+                // stage('Build Web Login') {
+                //     steps {
+                //         script {
+                //             echo '🔨 Building Web Login service...'
                             
-                            def webLoginImage = buildNodeProject(
-                                serviceName: 'web-login',
-                                workDir: './Web_login',
-                                runtime: 'node',
-                                ecrRepo: 'web-login',
-                                imageTag: env.IMAGE_TAG,
-                                buildCommand: 'npm run build'
-                            )
+                //             def webLoginImage = buildNodeProject(
+                //                 serviceName: 'web-login',
+                //                 workDir: './Web_login',
+                //                 runtime: 'node',
+                //                 ecrRepo: 'web-login',
+                //                 imageTag: env.IMAGE_TAG,
+                //                 buildCommand: 'npm run build'
+                //             )
                             
-                            env.WEB_LOGIN_IMAGE = webLoginImage.fullImageName
-                            echo "✅ Web Login built: ${env.WEB_LOGIN_IMAGE}"
-                        }
-                    }
-                }
+                //             env.WEB_LOGIN_IMAGE = webLoginImage.fullImageName
+                //             echo "✅ Web Login built: ${env.WEB_LOGIN_IMAGE}"
+                //         }
+                //     }
+                // }
             }
         }
         
