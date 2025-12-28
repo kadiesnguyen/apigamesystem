@@ -52,5 +52,10 @@ export const setupApp = async (): Promise<SetupResult> => {
     return g;
   });
 
+  // Health check endpoint for Kubernetes
+  app.get('/health', () => {
+    return { status: 'ok' };
+  });
+
   return { app, postgres, mongoDb, redisClient };
 };
