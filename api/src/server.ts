@@ -72,6 +72,14 @@ const app = new Elysia()
         return ctx.json({ accessToken: access });
     });
 
+// Health check endpoint
+app.get('/health', () => {
+    return new Response(JSON.stringify({ status: 'ok' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+    });
+});
+
 /** Auth guard */
 const authGuard = (handler: any) => (ctx: any) => {
     const hdr = ctx.request.headers.get('authorization') || '';
@@ -1040,36 +1048,36 @@ app.post('/api/debug/wallet', async ({ body }) => {
         currency?: string;
         balance?: number;
     };
-    
+
     if (!Number.isFinite(playerId) || !Number.isFinite(gameId)) {
         return new Response('playerId và gameId là bắt buộc', { status: 400 });
     }
-    
+
     // Kiểm tra player tồn tại
     const playerCheck = await pool.query(`SELECT id, username FROM players WHERE id = $1`, [playerId]);
     if (!playerCheck.rows.length) {
         return new Response('Player không tồn tại', { status: 404 });
     }
-    
+
     // Kiểm tra wallet đã tồn tại chưa
     const existCheck = await pool.query(
         `SELECT id FROM player_accounts WHERE player_id = $1 AND game_id = $2`, [playerId, gameId]);
     if (existCheck.rows.length) {
         return new Response(`Wallet cho player ${playerId} game ${gameId} đã tồn tại (ID: ${existCheck.rows[0].id})`, { status: 409 });
     }
-    
+
     const playerUsername = playerCheck.rows[0].username;
     const walletUsername = username || playerUsername;
     const walletCurrency = currency || 'VND';
     const initialBalance = balance ?? 0;
-    
+
     const result = await pool.query(
         `INSERT INTO player_accounts (player_id, game_id, username, currency, balance, locked_balance, free_spins, active)
          VALUES ($1, $2, $3, $4, $5, 0, 0, true)
          RETURNING id, player_id, game_id, username, currency, balance`,
         [playerId, gameId, walletUsername, walletCurrency, initialBalance]
     );
-    
+
     console.log(`✅ Tạo wallet mới: player=${playerId}, game=${gameId}, id=${result.rows[0].id}`);
     return new Response(JSON.stringify({ ok: true, wallet: result.rows[0] }), { headers: { 'Content-Type': 'application/json' } });
 });
@@ -1078,26 +1086,26 @@ app.post('/api/debug/wallet', async ({ body }) => {
 app.delete('/api/debug/wallet/:id', async ({ params }) => {
     const id = Number(params.id);
     if (!Number.isFinite(id)) return new Response('Bad id', { status: 400 });
-    
+
     // Kiểm tra wallet tồn tại
     const check = await pool.query(`SELECT id, balance, locked_balance FROM player_accounts WHERE id = $1`, [id]);
     if (!check.rows.length) return new Response('Wallet not found', { status: 404 });
-    
+
     const wallet = check.rows[0];
     const balance = parseFloat(wallet.balance) || 0;
     const locked = parseFloat(wallet.locked_balance) || 0;
-    
+
     // Cảnh báo nếu còn tiền
     if (balance > 0 || locked > 0) {
         console.warn(`⚠️ Xóa wallet #${id} còn balance=${balance}, locked=${locked}`);
     }
-    
+
     // Xóa các bản ghi liên quan trong account_ledger trước (nếu có foreign key)
     await pool.query(`DELETE FROM account_ledger WHERE account_id = $1`, [id]);
-    
+
     // Xóa wallet
     await pool.query(`DELETE FROM player_accounts WHERE id = $1`, [id]);
-    
+
     console.log(`🗑️ Đã xóa wallet #${id}`);
     return new Response(JSON.stringify({ ok: true, deleted: id }), { headers: { 'Content-Type': 'application/json' } });
 });
