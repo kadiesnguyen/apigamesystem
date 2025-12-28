@@ -15,14 +15,14 @@ const mongoOptions = {
     retryWrites: true,
     retryReads: true,
     // Timeouts
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
-    socketTimeoutMS: 45000,
-    // Enable TLS only for MongoDB Atlas
+    serverSelectionTimeoutMS: 5000,  // Reduced timeout for faster failure
+    connectTimeoutMS: 5000,
+    socketTimeoutMS: 10000,
+    // Enable TLS only for MongoDB Atlas with relaxed validation for Bun compatibility
     ...(isAtlas && {
         tls: true,
-        tlsAllowInvalidCertificates: false,
-        tlsAllowInvalidHostnames: false,
+        tlsAllowInvalidCertificates: true,  // Allow invalid certs for Bun compatibility
+        tlsAllowInvalidHostnames: true,     // Allow invalid hostnames for Bun compatibility
     }),
 };
 
