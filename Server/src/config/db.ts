@@ -9,11 +9,21 @@ const database = process.env.POSTGRES_DB || 'defaultdb';
 const host = process.env.POSTGRES_HOST || 'localhost';
 const port = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5432;
 
-const pool = new Pool({
-  // postgres://postgres:A1234@localhost:5432/game';
-  // connectionString: `postgres://${user}:${password}@${host}:${port}/${database}`,
+// Auto-detect if SSL is needed (AWS RDS or other cloud providers)
+const isCloudDb = host.includes('.rds.amazonaws.com');
+
+const poolConfig: any = {
   connectionString: `postgres://${user}:${password}@${host}:${port}/${database}`,
-});
+};
+
+// Enable SSL for cloud databases
+if (isCloudDb) {
+  poolConfig.ssl = {
+    rejectUnauthorized: false, // Accept self-signed certificates
+  };
+}
+
+const pool = new Pool(poolConfig);
 
 let isConnected = false;
 
