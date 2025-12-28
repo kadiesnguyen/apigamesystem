@@ -19,7 +19,30 @@ console.log('✅ DB pool (Postgres) created');
 
 // ---------- MongoDB ----------
 const mongoUrl = process.env.MONGO_URL || 'mongodb://localhost:27017';
-export const mongoClient = new MongoClient(mongoUrl);
+
+// Auto-detect MongoDB Atlas and enable TLS only for Atlas
+const isAtlas = mongoUrl.startsWith('mongodb+srv://') || mongoUrl.includes('.mongodb.net');
+
+const mongoOptions = {
+  // Connection pool settings
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  // Retry settings
+  retryWrites: true,
+  retryReads: true,
+  // Timeouts
+  serverSelectionTimeoutMS: 30000,
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 45000,
+  // Enable TLS only for MongoDB Atlas
+  ...(isAtlas && {
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+    tlsAllowInvalidHostnames: false,
+  }),
+};
+
+export const mongoClient = new MongoClient(mongoUrl, mongoOptions);
 export let mongoDb: ReturnType<MongoClient['db']>;
 
 // Hàm connect Mongo, gọi khi app khởi động

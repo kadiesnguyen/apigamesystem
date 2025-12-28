@@ -4,7 +4,29 @@ import { env } from './env';
 const MONGO_URI = env.mongoUri || 'mongodb://localhost:27017';
 const DB_NAME = process.env.MONGO_DB || env.mongoDbName || 'logs';
 
-const client = new MongoClient(MONGO_URI);
+// Auto-detect MongoDB Atlas and enable TLS only for Atlas
+const isAtlas = MONGO_URI.startsWith('mongodb+srv://') || MONGO_URI.includes('.mongodb.net');
+
+const mongoOptions = {
+    // Connection pool settings
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    // Retry settings
+    retryWrites: true,
+    retryReads: true,
+    // Timeouts
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    // Enable TLS only for MongoDB Atlas
+    ...(isAtlas && {
+        tls: true,
+        tlsAllowInvalidCertificates: false,
+        tlsAllowInvalidHostnames: false,
+    }),
+};
+
+const client = new MongoClient(MONGO_URI, mongoOptions);
 
 let cachedDb: Db | null = null;
 
