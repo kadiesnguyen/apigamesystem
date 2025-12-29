@@ -13,6 +13,7 @@ import { mongo } from './config/mongo';
 import { db } from './config/db';
 import { redis } from './config/redis';
 import cors from '@elysiajs/cors';
+import { wsPlugin } from './ws/WSManager';
 
 const app = new Elysia();
 
@@ -39,6 +40,9 @@ export const setupApp = async (): Promise<SetupResult> => {
   // Middleware + routes
   app.use(cors({ origin: '*' }));
   app.use(loggerMiddleware);
+
+  // WebSocket support on same port
+  app.use(wsPlugin);
 
   app.group('/api', (g) => {
     authMiddleware(g);

@@ -1,20 +1,20 @@
 // WSManager.ts
-import { WebSocketServer } from 'ws';
+import { Elysia } from 'elysia';
 import { GameManager } from '../games/GameManager';
 
-export class WSManager {
-    private wss: WebSocketServer;
-
-    constructor(server: any) {
-        this.wss = new WebSocketServer({ server });
-        console.log('🔌 WebSocket server is starting...');
-
-        this.wss.on('connection', (ws, req) => {
-            const url = new URL(req.url || '', 'http://localhost');
+// WebSocket handler for Elysia - same port as HTTP
+export const wsPlugin = new Elysia()
+    .ws('/ws', {
+        open(ws) {
+            const url = new URL(ws.data.request.url);
             const gameID = url.searchParams.get('gameID');
             const token = url.searchParams.get('token');
 
             console.log('🌐 WS connection attempt:', { gameID, token });
+
+            // Store connection info on the websocket object
+            (ws as any).gameID = gameID;
+            (ws as any).token = token;
 
             const game = GameManager.get(gameID);
             if (!game || typeof game.socketHandler !== 'function') {
@@ -24,7 +24,39 @@ export class WSManager {
                 return;
             }
 
-            game.socketHandler(ws, token);
-        });
-    }
-}
+            // Pass an adapter that matches the ws library interface
+            const wsAdapter = {
+                send: (data: string | Buffer) => ws.send(data),
+                close: () => ws.close(),
+                on: (event: string, handler: Function) => {
+                    // Store handlers for later use
+                    if (!(ws as any)._handlers) (ws as any)._handlers = {};
+                    (ws as any)._handlers[event] = handler;
+                },
+                // Expose raw websocket for advanced usage
+                raw: ws
+            };
+
+            game.socketHandler(wsAdapter, token);
+        },
+        message(ws, message) {
+            const handlers = (ws as any)._handlers;
+            if (handlers?.message) {
+                handlers.message(message);
+            }
+        },
+        close(ws) {
+            const handlers = (ws as any)._handlers;
+            if (handlers?.close) {
+                handlers.close();
+            }
+        },
+        error(ws, error) {
+            const handlers = (ws as any)._handlers;
+            if (handlers?.error) {
+                handlers.error(error);
+            }
+        }
+    });
+
+console.log('🔌 WebSocket plugin initialized');

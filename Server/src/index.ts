@@ -1,6 +1,5 @@
 // src/index.ts
 import { setupApp } from './app';
-import { WSManager } from './ws/WSManager';
 import { registerGames } from './games';
 import { registerAllGames } from './config/register-games';
 import { ConfigManager } from './config/ConfigManager';
@@ -18,18 +17,16 @@ async function main() {
   const PORT = Number(process.env.PORT) || 3000;
 
   // Start Elysia HTTP server with WebSocket support on same port
-  const server = app.listen({
+  app.listen({
     port: PORT,
     hostname: '0.0.0.0'
   });
 
-  // Attach WebSocket to the underlying Node HTTP server
-  new WSManager(server.server);
-
   console.log(`✅ API đang chạy tại http://0.0.0.0:${PORT}`);
-  console.log(`✅ WebSocket chạy tại ws://0.0.0.0:${PORT}`);
+  console.log(`✅ WebSocket chạy tại ws://0.0.0.0:${PORT}/ws`);
 }
 
 main().catch((err) => {
   console.error('❌ Không thể khởi động server:', err);
+});
 });
