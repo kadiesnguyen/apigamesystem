@@ -10,6 +10,10 @@ const base: any = {
   user: process.env.PG_USER,
   database: process.env.PG_DATABASE,
   max: 10,
+  // Enable SSL for AWS RDS connections
+  ssl: process.env.PG_SSL === 'false' ? false : {
+    rejectUnauthorized: false, // Required for AWS RDS
+  },
 };
 if (typeof process.env.PG_PASSWORD === 'string' && process.env.PG_PASSWORD !== '') {
   base.password = process.env.PG_PASSWORD;
