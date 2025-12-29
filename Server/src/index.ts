@@ -29,4 +29,3 @@ async function main() {
 main().catch((err) => {
   console.error('❌ Không thể khởi động server:', err);
 });
-});
