@@ -1,7 +1,5 @@
 // src/index.ts
-import { createServer } from 'http';
 import { setupApp } from './app';
-import { WSManager } from './ws/WSManager';
 import { registerGames } from './games';
 import { registerAllGames } from './config/register-games';
 import { ConfigManager } from './config/ConfigManager';
@@ -16,23 +14,16 @@ async function main() {
   await ConfigManager.I.bootstrapGameOnly([1001]); // seed ngay (tuỳ chọn)
   registerGames(postgres, mongoDb);
 
-  // Start WebSocket on :3001
-  const wsServer = createServer();
+  const PORT = Number(process.env.PORT) || 3000;
 
-  new WSManager(wsServer, {
-    pg: postgres,
-    mongo: mongoDb,
-    redis: redisClient
+  // Start Elysia HTTP server with WebSocket support on same port
+  app.listen({
+    port: PORT,
+    hostname: '0.0.0.0'
   });
 
-  wsServer.listen(3001, () =>
-    console.log('✅ WebSocket chạy tại ws://localhost:3001')
-  );
-
-  // Finally start HTTP API on :3000
-  app.listen(3000, () =>
-    console.log('✅ API đang chạy tại http://localhost:3000')
-  );
+  console.log(`✅ API đang chạy tại http://0.0.0.0:${PORT}`);
+  console.log(`✅ WebSocket chạy tại ws://0.0.0.0:${PORT}/ws`);
 }
 
 main().catch((err) => {

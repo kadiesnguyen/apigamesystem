@@ -13,6 +13,7 @@ export default ({ mode }) => {
       outDir: 'dist',
     },
     server: {
+      allowedHosts: ['cms.kjcgame.com'],
       proxy: {
         '/api': {
           target: API,

@@ -12,6 +12,6 @@ export const env = {
     postgresUser: process.env.POSTGRES_USER || 'user',
     postgresPassword: process.env.POSTGRES_PASSWORD || 'password',
     postgresDatabase: process.env.POSTGRES_DB || 'database',
-    mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017',
+    mongoUri: process.env.MONGO_URL || process.env.MONGO_URI || 'mongodb://localhost:27017',
     mongoDbName: process.env.MONGO_DB_NAME || 'logs',
 };
