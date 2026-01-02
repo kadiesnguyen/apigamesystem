@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { Db, Collection } from 'mongodb';
 import { GridModel, type StepRoundPayload, type CopyEvent } from './gridmodel';
 import { MahjongWay2Config } from './config';
-import { UserBalanceService } from '../../services/UserBalanceService';
+import { UserBalanceService } from '../../services/UserBalanceService';d
 import { ConfigManager } from '../../../config/ConfigManager';
 import type { MahjongWay2Runtime } from './adapter';
 import {
@@ -24,7 +24,7 @@ export interface SpinResult {
 export class MahjongWay2Logic {
     private spinsCol: Collection;
     private gameLogService: GameLogService;
-
+d
     constructor(private db: Pool, private mongoDb: Db) {
         this.spinsCol = this.mongoDb.collection('logs.game');
         this.gameLogService = new GameLogService(this.mongoDb);
@@ -122,7 +122,7 @@ export class MahjongWay2Logic {
 
         const model = new GridModel(
             MahjongWay2Config.Cols,
-            MahjongWay2Config.Rows,
+            MahjongWay2Config.RowsPerColumn,
             cfg.payoutTable,
             cfg.scatterChance,
             cfg.goldenChance,
@@ -227,20 +227,30 @@ export class MahjongWay2Logic {
             if (t === 'w') out.wt = cell.wildType ?? 'blue';
             return out;
         };
-        const rowsVisible = MahjongWay2Config.Rows ?? 0;
+        const rowsPerColumn = MahjongWay2Config.RowsPerColumn ?? [4, 5, 5, 5, 4];
+        const maxRows = Math.max(...rowsPerColumn);
         const rowsAbove = MahjongWay2Config.RowsAbove ?? 0;
-        const toClientRow = (engineRow: number): number => {
-            if (rowsVisible <= 0) return engineRow;
-            return rowsVisible - 1 - engineRow;
+        
+        // Giữ nguyên row position từ engine - client sẽ render row 0 ở dưới cùng
+        // Không cần transform vì grid không được reverse
+        const toClientRow = (engineRow: number, _colIndex?: number): number => {
+            return engineRow;
         };
+        
+        // Pack grid với số hàng khác nhau cho mỗi cột
+        // KHÔNG reverse - giữ nguyên thứ tự từ engine (row 0 = bottom)
+        // Client sẽ render row 0 ở dưới cùng
         const packVisibleGrid = (grid: any[][]): PackedCell[][] =>
-            (grid ?? []).map(col => {
+            (grid ?? []).map((col, colIndex) => {
                 const safeCol = col ?? [];
-                const topDown = [...safeCol].reverse();
-                return topDown.map(packCell);
+                const rowCount = rowsPerColumn[colIndex] ?? maxRows;
+                // Chỉ lấy số hàng tương ứng với cột đó
+                const limitedCol = safeCol.slice(0, rowCount);
+                // Giữ nguyên thứ tự từ engine (row 0 = bottom)
+                return limitedCol.map(packCell);
             });
         const packAboveGrid = (grid: any[][]): PackedCell[][] =>
-            (grid ?? []).map(col => {
+            (grid ?? []).map((col, colIndex) => {
                 const safeCol = col ?? [];
                 const limit = Math.max(0, rowsAbove);
                 const effective = limit > 0 ? safeCol.slice(0, limit) : [];
@@ -341,6 +351,12 @@ export class MahjongWay2Logic {
             totalWin,
             free: freeMeta,
             rounds: transformedRounds,
+            // Thông tin cấu trúc grid cho client biết số hàng mỗi cột
+            gridConfig: {
+                cols: MahjongWay2Config.Cols,
+                rowsPerColumn: rowsPerColumn,
+                maxRows: maxRows,
+            },
         };
     }
 

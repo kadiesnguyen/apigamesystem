@@ -2,15 +2,14 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5
--- Dumped by pg_dump version 17.5
+\restrict GmmKN8mRPORJUcH8f2dF4KFHyg9chbYT27X3jdfemakN7a5vArcwvMFZqH47nXa
 
--- Started on 2025-11-05 07:20:39
+-- Dumped from database version 14.20 (Ubuntu 14.20-0ubuntu0.22.04.1)
+-- Dumped by pg_dump version 14.20 (Ubuntu 14.20-0ubuntu0.22.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -20,7 +19,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 3 (class 3079 OID 16777)
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -28,8 +26,6 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 
 --
--- TOC entry 5096 (class 0 OID 0)
--- Dependencies: 3
 -- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
 --
 
@@ -37,7 +33,6 @@ COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 
 
 --
--- TOC entry 2 (class 3079 OID 16581)
 -- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -45,8 +40,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
 
 --
--- TOC entry 5097 (class 0 OID 0)
--- Dependencies: 2
 -- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
 --
 
@@ -54,7 +47,6 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 
 
 --
--- TOC entry 925 (class 1247 OID 16609)
 -- Name: game_category; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -68,7 +60,6 @@ CREATE TYPE public.game_category AS ENUM (
 ALTER TYPE public.game_category OWNER TO postgres;
 
 --
--- TOC entry 931 (class 1247 OID 16624)
 -- Name: game_status; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -82,7 +73,6 @@ CREATE TYPE public.game_status AS ENUM (
 ALTER TYPE public.game_status OWNER TO postgres;
 
 --
--- TOC entry 928 (class 1247 OID 16616)
 -- Name: volatility; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -96,7 +86,6 @@ CREATE TYPE public.volatility AS ENUM (
 ALTER TYPE public.volatility OWNER TO postgres;
 
 --
--- TOC entry 282 (class 1255 OID 16862)
 -- Name: fn_acc_partner_match(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -121,7 +110,6 @@ $$;
 ALTER FUNCTION public.fn_acc_partner_match() OWNER TO postgres;
 
 --
--- TOC entry 245 (class 1255 OID 16669)
 -- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -138,7 +126,6 @@ $$;
 ALTER FUNCTION public.set_updated_at() OWNER TO postgres;
 
 --
--- TOC entry 297 (class 1255 OID 16884)
 -- Name: sp_deposit(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -167,7 +154,6 @@ $$;
 ALTER FUNCTION public.sp_deposit(p_account_id bigint, p_amount numeric, p_ref_id character varying, p_meta jsonb) OWNER TO postgres;
 
 --
--- TOC entry 295 (class 1255 OID 16882)
 -- Name: sp_ensure_game_account(bigint, integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -205,7 +191,6 @@ $$;
 ALTER FUNCTION public.sp_ensure_game_account(p_player_id bigint, p_game_id integer, p_username character varying, p_currency character varying) OWNER TO postgres;
 
 --
--- TOC entry 299 (class 1255 OID 16886)
 -- Name: sp_hold(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -235,7 +220,6 @@ $$;
 ALTER FUNCTION public.sp_hold(p_account_id bigint, p_stake numeric, p_round_id character varying, p_meta jsonb) OWNER TO postgres;
 
 --
--- TOC entry 296 (class 1255 OID 16883)
 -- Name: sp_login_player(integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -269,7 +253,6 @@ $$;
 ALTER FUNCTION public.sp_login_player(p_partner_id integer, p_username character varying, p_password_plain character varying) OWNER TO postgres;
 
 --
--- TOC entry 283 (class 1255 OID 16881)
 -- Name: sp_register_player(integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -291,7 +274,6 @@ $$;
 ALTER FUNCTION public.sp_register_player(p_partner_id integer, p_username character varying, p_password_hash character varying) OWNER TO postgres;
 
 --
--- TOC entry 301 (class 1255 OID 16888)
 -- Name: sp_release_only(bigint, character varying, numeric, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -319,7 +301,6 @@ $$;
 ALTER FUNCTION public.sp_release_only(p_account_id bigint, p_round_id character varying, p_stake numeric, p_meta jsonb) OWNER TO postgres;
 
 --
--- TOC entry 300 (class 1255 OID 16887)
 -- Name: sp_settle(bigint, character varying, numeric, numeric, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -358,7 +339,6 @@ $$;
 ALTER FUNCTION public.sp_settle(p_account_id bigint, p_round_id character varying, p_stake numeric, p_payout numeric, p_meta jsonb) OWNER TO postgres;
 
 --
--- TOC entry 298 (class 1255 OID 16885)
 -- Name: sp_withdraw(bigint, numeric, character varying, jsonb); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -387,7 +367,6 @@ $$;
 ALTER FUNCTION public.sp_withdraw(p_account_id bigint, p_amount numeric, p_ref_id character varying, p_meta jsonb) OWNER TO postgres;
 
 --
--- TOC entry 234 (class 1255 OID 16517)
 -- Name: superace_user_set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -408,7 +387,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- TOC entry 233 (class 1259 OID 16865)
 -- Name: account_ledger; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -427,7 +405,6 @@ CREATE TABLE public.account_ledger (
 ALTER TABLE public.account_ledger OWNER TO postgres;
 
 --
--- TOC entry 232 (class 1259 OID 16864)
 -- Name: account_ledger_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -439,11 +416,9 @@ CREATE SEQUENCE public.account_ledger_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.account_ledger_id_seq OWNER TO postgres;
+ALTER TABLE public.account_ledger_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5098 (class 0 OID 0)
--- Dependencies: 232
 -- Name: account_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -451,7 +426,6 @@ ALTER SEQUENCE public.account_ledger_id_seq OWNED BY public.account_ledger.id;
 
 
 --
--- TOC entry 227 (class 1259 OID 16763)
 -- Name: admin_sessions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -470,7 +444,6 @@ CREATE TABLE public.admin_sessions (
 ALTER TABLE public.admin_sessions OWNER TO postgres;
 
 --
--- TOC entry 226 (class 1259 OID 16732)
 -- Name: admin_users; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -496,7 +469,6 @@ CREATE TABLE public.admin_users (
 ALTER TABLE public.admin_users OWNER TO postgres;
 
 --
--- TOC entry 225 (class 1259 OID 16731)
 -- Name: admin_users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -508,11 +480,9 @@ CREATE SEQUENCE public.admin_users_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.admin_users_id_seq OWNER TO postgres;
+ALTER TABLE public.admin_users_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5099 (class 0 OID 0)
--- Dependencies: 225
 -- Name: admin_users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -520,7 +490,6 @@ ALTER SEQUENCE public.admin_users_id_seq OWNED BY public.admin_users.id;
 
 
 --
--- TOC entry 223 (class 1259 OID 16672)
 -- Name: games; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -544,7 +513,6 @@ CREATE TABLE public.games (
 ALTER TABLE public.games OWNER TO postgres;
 
 --
--- TOC entry 224 (class 1259 OID 16686)
 -- Name: partner_games; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -563,7 +531,6 @@ CREATE TABLE public.partner_games (
 ALTER TABLE public.partner_games OWNER TO postgres;
 
 --
--- TOC entry 220 (class 1259 OID 16419)
 -- Name: partner_sessions; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -580,7 +547,6 @@ CREATE TABLE public.partner_sessions (
 ALTER TABLE public.partner_sessions OWNER TO postgres;
 
 --
--- TOC entry 219 (class 1259 OID 16418)
 -- Name: partner_sessions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -593,11 +559,9 @@ CREATE SEQUENCE public.partner_sessions_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.partner_sessions_id_seq OWNER TO postgres;
+ALTER TABLE public.partner_sessions_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5100 (class 0 OID 0)
--- Dependencies: 219
 -- Name: partner_sessions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -605,7 +569,6 @@ ALTER SEQUENCE public.partner_sessions_id_seq OWNED BY public.partner_sessions.i
 
 
 --
--- TOC entry 222 (class 1259 OID 16475)
 -- Name: partners; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -622,7 +585,6 @@ CREATE TABLE public.partners (
 ALTER TABLE public.partners OWNER TO postgres;
 
 --
--- TOC entry 221 (class 1259 OID 16474)
 -- Name: partners_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -635,11 +597,9 @@ CREATE SEQUENCE public.partners_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.partners_id_seq OWNER TO postgres;
+ALTER TABLE public.partners_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5101 (class 0 OID 0)
--- Dependencies: 221
 -- Name: partners_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -647,7 +607,6 @@ ALTER SEQUENCE public.partners_id_seq OWNED BY public.partners.id;
 
 
 --
--- TOC entry 231 (class 1259 OID 16831)
 -- Name: player_accounts; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -669,7 +628,6 @@ CREATE TABLE public.player_accounts (
 ALTER TABLE public.player_accounts OWNER TO postgres;
 
 --
--- TOC entry 230 (class 1259 OID 16830)
 -- Name: player_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -681,11 +639,9 @@ CREATE SEQUENCE public.player_accounts_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.player_accounts_id_seq OWNER TO postgres;
+ALTER TABLE public.player_accounts_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5102 (class 0 OID 0)
--- Dependencies: 230
 -- Name: player_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -693,7 +649,6 @@ ALTER SEQUENCE public.player_accounts_id_seq OWNED BY public.player_accounts.id;
 
 
 --
--- TOC entry 229 (class 1259 OID 16815)
 -- Name: players; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -710,7 +665,6 @@ CREATE TABLE public.players (
 ALTER TABLE public.players OWNER TO postgres;
 
 --
--- TOC entry 228 (class 1259 OID 16814)
 -- Name: players_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -722,11 +676,9 @@ CREATE SEQUENCE public.players_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.players_id_seq OWNER TO postgres;
+ALTER TABLE public.players_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5103 (class 0 OID 0)
--- Dependencies: 228
 -- Name: players_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
@@ -734,7 +686,6 @@ ALTER SEQUENCE public.players_id_seq OWNED BY public.players.id;
 
 
 --
--- TOC entry 4879 (class 2604 OID 16868)
 -- Name: account_ledger id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -742,7 +693,6 @@ ALTER TABLE ONLY public.account_ledger ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
--- TOC entry 4861 (class 2604 OID 16735)
 -- Name: admin_users id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -750,7 +700,6 @@ ALTER TABLE ONLY public.admin_users ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
--- TOC entry 4847 (class 2604 OID 16422)
 -- Name: partner_sessions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -758,7 +707,6 @@ ALTER TABLE ONLY public.partner_sessions ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- TOC entry 4850 (class 2604 OID 16478)
 -- Name: partners id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -766,7 +714,6 @@ ALTER TABLE ONLY public.partners ALTER COLUMN id SET DEFAULT nextval('public.par
 
 
 --
--- TOC entry 4872 (class 2604 OID 16834)
 -- Name: player_accounts id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -774,7 +721,6 @@ ALTER TABLE ONLY public.player_accounts ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
--- TOC entry 4869 (class 2604 OID 16818)
 -- Name: players id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -782,8 +728,6 @@ ALTER TABLE ONLY public.players ALTER COLUMN id SET DEFAULT nextval('public.play
 
 
 --
--- TOC entry 5090 (class 0 OID 16865)
--- Dependencies: 233
 -- Data for Name: account_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -868,12 +812,16 @@ COPY public.account_ledger (id, account_id, ref_type, ref_id, amount, balance_af
 78	3	deposit	cms-dep:51:1755416023769	55.00	556.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-08-17 14:33:43.776476+07
 79	3	withdraw	cms-wd:51:1755416477519	-111.00	445.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 14:41:17.529916+07
 80	3	withdraw	cms-wd:51:1755416483919	-111.00	334.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36", "reason": "CMS withdraw", "source": "cms", "adminId": "1"}	2025-08-17 14:41:23.928524+07
+81	6	deposit	cms-dep:51:1762844706201	100000.00	100000.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-11-11 14:05:07.81546+07
+83	14	deposit	cms-dep:51:1764579325985	1000.00	1000.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-12-01 15:55:26.066872+07
+84	16	deposit	cms-dep:67:1764827795980	100000.00	100000.00	{"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-12-04 12:56:40.24426+07
+85	17	deposit	cms-dep:67:1764924230670	1000000.00	1000000.00	{"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-12-05 15:43:50.944558+07
+86	21	deposit	cms-dep:76:1765264980025	10000.00	10000.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-12-09 14:23:00.590667+07
+87	22	deposit	cms-dep:77:1765270613962	10000.00	10000.00	{"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36", "reason": "CMS deposit", "source": "cms", "adminId": "1"}	2025-12-09 15:56:54.504114+07
 \.
 
 
 --
--- TOC entry 5084 (class 0 OID 16763)
--- Dependencies: 227
 -- Data for Name: admin_sessions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -896,34 +844,67 @@ a5314547-b1cc-4d57-b095-03c9f0117d68	1	bebb4a5925d291f13d8b2e88e53343c37904bbe3f
 eff0d39c-ee27-43e9-a80a-9a654ee3be01	1	b27e3c902ccdca7978f584635046c3306e5ae70fad000e8f5a6d953574e83862	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-17 22:54:21.324054+07	2025-09-16 22:54:21.324054+07	2025-08-18 00:45:14.449076+07
 3a89815e-dbef-40e7-b7b8-7aff10c59752	1	3f47d1ce0805695ba30dc2adf8c80e0823da66aec0b84ae630a48add9402a71b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-18 00:45:14.450397+07	2025-08-25 00:45:14.450397+07	\N
 74dc1161-3424-4f1c-bd4e-4683f4fcc5b7	1	3c0ed2f9048b5ad8b63218bdf78f8b96e25d5b2dea17d854ae6f59cc1d2292b2	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	\N	2025-08-18 00:45:25.553173+07	2025-09-17 00:45:25.553173+07	\N
+74c822b5-1896-471c-888c-40ef32ec0d1a	1	1dac1ede20e2a8998871df1a7a5d9a272d96f6b0ce8b18da8de991667bae92f5	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36	\N	2025-11-05 07:43:35.28498+07	2025-12-05 07:43:35.28498+07	\N
+ac645071-1753-43c4-bac7-757c75b99fc2	1	e819555f17e4b3ca54909c216b3086f229d09f37f27863684afc924bc7e1440b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-10 10:19:25.740311+07	2025-12-10 10:19:25.740311+07	\N
+b78c0e07-e417-40bb-957f-7595459534d0	1	e1ee21abd33292dea6226e353a6ad308c2e5ad532edfb4cf8d356e8ed33f84cc	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-10 10:19:49.138862+07	2025-12-10 10:19:49.138862+07	\N
+dac1bb0d-b392-4ce1-b39e-cf5acc010ae0	1	d8cdf58a82c4724bf2bd951a32e791ea94fa2fb6b5939b56a21b21e91124a201	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	\N	2025-11-10 14:46:16.452869+07	2025-12-10 14:46:16.452869+07	\N
+f45d0ff9-cb42-4205-90c0-242841dcdf15	1	0ab8a28c000d4c67ffa8241d67d59d1b337089267d1f5b12e35545895552a05c	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-10 18:29:57.880066+07	2025-12-10 18:29:57.880066+07	\N
+7fedfefc-ece0-4607-bf6d-7fcaa9efba34	1	34b3d4b69a5960a7c6552654992c4ae9962feeef8d2f09883b5b5f8ad867c1a5	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-11 11:52:06.847219+07	2025-12-11 11:52:06.847219+07	\N
+c04a6e0e-c1f6-4981-8ba5-b9b6b344b93f	1	c2dcd4d3bfee5b136fa41a73d98579437e300c4a4dcbdba8ada33a14cec6fb83	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-11 13:17:27.678683+07	2025-12-11 13:17:27.678683+07	\N
+7e2233ae-030f-4202-8386-148f6747653d	1	81b9d2e1a8bab736167512679bf2462ebb9ed93e78d75d60d4270d51d0b72445	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-11 14:03:11.953301+07	2025-12-11 14:03:11.953301+07	\N
+5ca391e7-500e-4cc2-8781-ef0323a6da32	1	0efbdcd0a27e8e004428e0d973b5874f1b07f10876db98299ad7e32a9cc51714	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-13 09:44:54.12661+07	2025-12-13 09:44:54.12661+07	\N
+45c3e0ad-70e2-4619-9ed9-19547eb2c04e	1	46f4f841380683fd8f206a1b208cf0966020ea3af1dc49dda4436aeeb0be4b9a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-14 10:27:52.403269+07	2025-12-14 10:27:52.403269+07	\N
+66c51391-c936-4d1d-b897-4f8f3d9271c9	1	36de1e0a1f0a7c617c9860cddf3599db180f352d73706d51a0018594a9991bc9	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-23 12:48:35.616278+07	2025-12-23 12:48:35.616278+07	\N
+f620b1bb-19a2-42bc-810f-5e41b8d34cd5	1	b80fd2342dfc2328ff73fae0af988e54c6c915cbc609eda8645772cd3e97cbd3	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-24 14:34:41.224053+07	2025-12-24 14:34:41.224053+07	\N
+5cb74d10-4e82-4ac5-8b1a-ba350d137c6e	1	0282080c73262e47da0be6718637ffc6a3bc3a113f5e703a0ee74834345af02a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-24 14:34:53.316741+07	2025-12-24 14:34:53.316741+07	\N
+73f38a24-f63f-47cb-a163-7fe34cb18d54	1	ea7f3f105d987a340b8cfd5626c680dd8aec15b716a0aee99677364de17c4a7e	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 00:44:06.772853+07	2025-12-25 00:44:06.772853+07	\N
+8e54a10b-4c50-47c4-98e0-4519b4c3b2ee	1	8e00ef5e09d9b9fd019bd8f84bbff041dbb5fa5b85c9ed641251e3a73ec8f54a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 07:13:13.540092+07	2025-12-25 07:13:13.540092+07	\N
+b95237b3-00b5-4869-bf05-7f8c4e833eb0	1	efb8dea6a4854d21be68e39fc959812fc366c216600a59d941b5b46829ab94f7	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 07:25:58.399275+07	2025-12-25 07:25:58.399275+07	\N
+62a773b5-3f6e-4cc3-bb48-fb07f53809f3	1	937694d329b2d175c7496130b1498525084fc726816591ab3b9ae3738ba1069c	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 07:26:45.201+07	2025-12-25 07:26:45.201+07	\N
+7977d62f-df86-4d23-9c5a-3d625a8599b4	1	c37d0674ab2df6aef184b0bb1f982eb9a89b96167945a9113cd8ca1cab8f1781	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 15:47:16.622519+07	2025-12-25 15:47:16.622519+07	\N
+f0c5bc19-b785-4390-a25b-8c722c3c481c	1	92d44a246f8e407667c146043d2327ae1e103b4082f5a7700ec76e2b5ef4c63a	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 15:52:14.773573+07	2025-12-25 15:52:14.773573+07	\N
+6e48bb7d-1e01-4e35-8e69-9c349dd65c97	1	b98abc5d7093358d3955674fa5d85a2e1f51de414c245670468cb3ec0797072c	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-25 15:56:22.991277+07	2025-12-25 15:56:22.991277+07	\N
+c3cb4504-a64f-4c1a-a63e-ba5c019af20e	1	c94efbc50ebd45b42abe0aa0bc8fb187de7053e7c3d015a5f60f61bf2681cf3c	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-26 10:13:42.067272+07	2025-12-26 10:13:42.067272+07	\N
+559cd90f-a6cc-488f-8cff-b0c77e78c00f	1	b13c0150393efc047d2ab18ab450ad8176520ff01885f637884d306d53a9dee1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-28 14:17:13.838931+07	2025-12-28 14:17:13.838931+07	\N
+25a6cf93-1df3-4bed-bcf7-d4967b08c802	1	6f2d62e3a753fb390af354ac6ebae5c842acf658a50f98ef1a8ee4290c5f71cc	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-28 14:48:25.394153+07	2025-12-28 14:48:25.394153+07	\N
+2bb3a435-c423-4c4d-850a-4cddead99ecd	1	34f8469eb64208e9655256285ac24c1167fea1b1662f855e1928f08a8c325908	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-28 16:28:58.491817+07	2025-12-28 16:28:58.491817+07	\N
+0eb8d04d-ade8-40b8-bb36-5838d7508d8b	1	ca700939611f4ac4953c4c778567f2ed8cf675d557387f61528e465a3a24468f	Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-11-29 12:01:40.039556+07	2025-12-29 12:01:40.039556+07	\N
+537bd809-7204-4e81-a105-f5a64cf30f0d	1	d692de262b80f6983a4aae5d3e9fa873b02022423c43855f0e67f903bb13c7bd	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-01 15:16:04.231574+07	2025-12-31 15:16:04.231574+07	\N
+eeddbc51-717b-4a37-89c9-fc4107bb88f5	1	8b022b5ac05431fda9cdb5323ba2bc62266cdc55ca8897c0325c67ca35b59abe	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-04 10:11:22.182894+07	2026-01-03 10:11:22.182894+07	\N
+535ad6af-209e-40a9-bf60-1eaed881fc4b	1	bef18bf1f70162267ca491022cf5ce5cb0e232929aa72b39801f177e4a83ee7b	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-04 10:11:49.927829+07	2026-01-03 10:11:49.927829+07	\N
+bb6fabf7-9e85-4b18-9e9f-75187e8d884f	1	0a1a9c1035a18e1137b8c8559b7308bc22b98c1bb4fd5efa3660d0fe81bd4c80	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	\N	2025-12-04 10:19:37.885431+07	2026-01-03 10:19:37.885431+07	\N
+51c0200d-2be0-46f5-8dd9-79a57b5729fa	1	782bcf61a4bc87833b104d0a414a99b5a262f8f217bbd738149e163af8d27582	Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1	\N	2025-12-04 12:54:19.725796+07	2026-01-03 12:54:19.725796+07	\N
+64407e1e-c8e3-4eb8-90f3-97939aa217c8	1	1386b61fd030c3b398a52d27f572c8dfd6c8e570420046551d7a607f4fe29878	Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15	\N	2025-12-04 12:56:14.802365+07	2026-01-03 12:56:14.802365+07	\N
+2e61efc2-126a-46d0-b375-469daaec7c0e	1	dd5b1da5c21ed374bf81055c1ae5ae6cc867848c330400545d57fa67c46da51e	Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15	\N	2025-12-05 15:43:13.462883+07	2026-01-04 15:43:13.462883+07	\N
+27f4e787-b24c-4ca2-9951-b358b52dc654	1	b3743ba488e656ec23bcd9214a7b3fcf5e92247655f22fb9ac56e9be3c5408a4	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-09 14:17:36.143935+07	2026-01-08 14:17:36.143935+07	\N
+e667b5c3-9b63-4781-b561-91c9d74a8bcd	1	15bd2439cca5ee2bfaad8233924729d95559595d2b6714cc0cc09e47962816e1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-09 14:19:02.889272+07	2026-01-08 14:19:02.889272+07	\N
+813c5ed4-7fa8-4dd9-bfaf-302580f9bd82	1	5ba4637dbab5d0f9d91a6e27e058c474066bc4a21464abb3718d360b4ea33915	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-09 14:22:37.69299+07	2026-01-08 14:22:37.69299+07	\N
+e70de701-f7e3-4f8c-894e-5202fb3fa8bc	1	47db90c34bd1749c292bfa730af07aad9bf3a40ec3de6a51c0294a6648704a38	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	\N	2025-12-09 15:56:41.960256+07	2026-01-08 15:56:41.960256+07	\N
+1d7a1296-0fdb-4b79-bc10-f023b6dad55f	1	2acaab088f1131e6e75ea5c6df888d685ae1b5468eed834353fcee1e28f85ff1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36	\N	2025-12-13 10:50:36.572329+07	2026-01-12 10:50:36.572329+07	\N
 \.
 
 
 --
--- TOC entry 5083 (class 0 OID 16732)
--- Dependencies: 226
 -- Data for Name: admin_users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.admin_users (id, username, display_name, email, password_hash, role, partner_id, is_active, timezone, language, last_login_at, created_at, updated_at) FROM stdin;
-1	admin	Super Administrator	admin@example.com	$2a$10$mlg39cP5lMuJ.jbrECNPZeZV6IYok.Mf2kFUPCW.lA/Y8Y1AIqqOW	superadmin	\N	t	GMT+7	vi	2025-08-18 00:45:25.556949+07	2025-08-17 01:02:29.053211+07	2025-08-18 00:45:25.556949+07
+1	admin	Super Administrator	admin@example.com	$2a$10$mlg39cP5lMuJ.jbrECNPZeZV6IYok.Mf2kFUPCW.lA/Y8Y1AIqqOW	superadmin	\N	t	GMT+7	vi	2025-12-13 10:50:36.581882+07	2025-08-17 01:02:29.053211+07	2025-12-13 10:50:36.581882+07
 \.
 
 
 --
--- TOC entry 5080 (class 0 OID 16672)
--- Dependencies: 223
 -- Data for Name: games; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.games (id, code, name, category, rtp, volatility, status, icon_url, desc_short, config, created_at, updated_at) FROM stdin;
 1001	superace	Super Ace	slot	80.20	high	active	\N	\N	{"noWinRate": 0.259, "payoutTable": [[0, 0, 0, 0.2, 0.6, 1], [0, 0, 0, 0.3, 0.9, 1.5], [0, 0, 0, 0.4, 1.2, 2], [0, 0, 0, 0.5, 1.5, 2.5], [0, 0, 0, 0.1, 0.3, 0.5], [0, 0, 0, 0.05, 0.15, 0.25], [0, 0, 0, 0.05, 0.15, 0.25], [0, 0, 0, 0.1, 0.3, 0.5]], "goldenChance": 0.373, "redWildChance": 0.03, "scatterChance": 0.02}	2025-08-15 16:18:46.956443+07	2025-08-18 01:11:20.992706+07
+1003	mahjongway	Majong Way	slot	80.10	medium	draft	\N	\N	{"baseBet": 20, "noWinRate": 0.259, "payoutTable": [[12, 60, 100, 0, 0, 0], [10, 40, 80, 0, 0, 0], [8, 20, 60, 0, 0, 0], [6, 15, 40, 0, 0, 0], [4, 10, 20, 0, 0, 0], [3, 10, 20, 0, 0, 0], [2, 5, 10, 0, 0, 0], [2, 5, 10, 0, 0, 0]], "goldenChance": 0.373, "redWildChance": 0.03, "scatterChance": 0.02}	2025-11-11 14:03:50.846435+07	2025-11-23 13:06:24.093793+07
+1002	mahjongway2	Majong Way 2	slot	96.50	high	active	\N	\N	{"baseBet": 20, "noWinRate": 0.259, "payoutTable": [[12, 60, 100, 0, 0, 0], [10, 40, 80, 0, 0, 0], [8, 20, 60, 0, 0, 0], [6, 15, 40, 0, 0, 0], [4, 10, 20, 0, 0, 0], [3, 10, 20, 0, 0, 0], [2, 5, 10, 0, 0, 0], [2, 5, 10, 0, 0, 0]], "goldenChance": 0.373, "scatterChance": 0.02}	2025-12-01 15:18:41.174452+07	2025-12-01 15:18:41.174452+07
 \.
 
 
 --
--- TOC entry 5081 (class 0 OID 16686)
--- Dependencies: 224
 -- Data for Name: partner_games; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -933,8 +914,6 @@ COPY public.partner_games (partner_id, game_id, enabled, rtp_override, sort_orde
 
 
 --
--- TOC entry 5077 (class 0 OID 16419)
--- Dependencies: 220
 -- Data for Name: partner_sessions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -968,8 +947,6 @@ COPY public.partner_sessions (id, partner_id, token, expires_at, created_at, use
 
 
 --
--- TOC entry 5079 (class 0 OID 16475)
--- Dependencies: 222
 -- Data for Name: partners; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -980,39 +957,59 @@ COPY public.partners (id, name, api_key, secret_key, created_at, active) FROM st
 
 
 --
--- TOC entry 5088 (class 0 OID 16831)
--- Dependencies: 231
 -- Data for Name: player_accounts; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.player_accounts (id, player_id, game_id, partner_id, username, currency, balance, locked_balance, active, created_at, free_spins) FROM stdin;
-3	51	1001	1	testuser1	VND	691.60	0.00	t	2025-08-17 02:39:23.612699+07	0
+11	61	1003	1	yudbe	VND	0.00	0.00	t	2025-11-30 12:34:41.842585+07	0
+3	51	1001	1	testuser1	VND	4313.25	0.00	t	2025-08-17 02:39:23.612699+07	10
+20	75	1002	1	checkgame1	VND	0.00	0.00	t	2025-12-09 13:54:21.288142+07	0
+15	66	1002	1	partner_abc	VND	0.00	0.00	t	2025-12-04 12:28:29.529965+07	0
+6	51	1003	1	testuser1	VND	824692.80	0.00	t	2025-11-11 14:04:10.998163+07	0
+14	51	1002	1	testuser1	VND	423208.80	0.00	t	2025-12-01 15:55:16.142972+07	0
+22	77	1002	1	checkgame2	VND	311163.00	0.00	t	2025-12-09 15:55:50.400464+07	24
+10	60	1003	1	test1231	VND	0.00	0.00	t	2025-11-29 13:15:15.698078+07	0
+16	67	1002	1	perfectsun	VND	2754468.00	0.00	t	2025-12-04 12:30:38.929811+07	38
+21	76	1003	1	partner_abc2	VND	15143.80	0.00	t	2025-12-09 14:21:28.857319+07	0
+18	69	1002	1	egantest	VND	0.00	0.00	t	2025-12-06 13:08:32.293259+07	0
+17	67	1003	1	perfectsun	VND	1051274.50	0.00	t	2025-12-05 15:43:37.898082+07	0
+19	73	1002	1	perfectsun2	VND	0.00	0.00	t	2025-12-09 11:13:51.016172+07	0
+7	52	1003	1	testuser122	VND	0.00	0.00	t	2025-11-28 14:37:09.715906+07	0
+8	53	1003	1	testuser166	VND	0.00	0.00	t	2025-11-28 15:34:19.153404+07	0
+9	56	1003	1	test123	VND	0.00	0.00	t	2025-11-28 15:48:02.866029+07	0
 \.
 
 
 --
--- TOC entry 5086 (class 0 OID 16815)
--- Dependencies: 229
 -- Data for Name: players; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.players (id, partner_id, username, password_hash, active, created_at) FROM stdin;
+52	1	testuser122	$2b$10$dc9i9VA0UiD.UsLbdKGEwer2CHyJa7EJNd6iqq1jncKTYxBDNAj9W	t	2025-11-28 14:37:09.715906+07
+53	1	testuser166	$2b$10$6B6gJ0sZV2JmzZIccvP/t.xL0t5VI8sSbcLHqJFkYeg5zze0uE1ce	t	2025-11-28 15:34:19.153404+07
+56	1	test123	$2b$10$/x0VL9lrUoNGZdabep/pkOGV7OxGUfQfD8RfKwIKrOaGxjlMDteAq	t	2025-11-28 15:48:02.866029+07
+60	1	test1231	$2b$10$i4jiUAJTtqm0ZQuYwVbahe/6cnghq9IIgcFBFl1fmjG34DH/444Ae	t	2025-11-29 13:15:15.698078+07
+61	1	yudbe	$2b$10$OamoM7Lb15N13vleTZvW0uLYxlY9pv0lVHECbaVZmP803KXZ63qjS	t	2025-11-30 12:34:41.842585+07
+62	1	usertest1	$2b$10$PVmSpezRJjdArxyKq2gd.OwLsjKVSgDV/sGzgYLkG9ZPk19u9dMSq	t	2025-12-01 15:29:39.183721+07
 51	1	testuser1	$2b$10$n3ni4ng1j/mQyFYwoAhGiO1DPXJPhuwIfbAdjTGxieNvBnTNJ/afO	t	2025-08-17 02:39:23.612699+07
+66	1	partner_abc	$2b$10$4xkB5UN0pZmlcyP1d882..PuBkiB8zsg9K2uH/X.XHOKnCEmwXPaC	t	2025-12-04 12:28:29.529965+07
+67	1	perfectsun	$2b$10$6Rt/3GQHMEGi12sBWNLw0ONIFjrRnbKcJFveB70Kr./rpP9QNOioK	t	2025-12-04 12:30:38.929811+07
+69	1	egantest	$2b$10$Uhnxng1YtebW7LMJRGTiLeoqWFfEjYCD5YyppeTFVCfXcrBpnMdNy	t	2025-12-06 13:08:32.293259+07
+73	1	perfectsun2	$2b$10$du6uD5MRIEe.zcmISG4pre9pdtgTaIoiKTs40krualdMzHcBFJcim	t	2025-12-09 11:13:51.016172+07
+75	1	checkgame1	$2b$10$2aa2NWR4/zglDhHTyQw2lOsObgem6v8JJZqbwJXtmvIyHlT87vaya	t	2025-12-09 13:54:21.288142+07
+76	1	partner_abc2	$2b$10$7TdfZzJDXIb0JFHCca2KnesT3qK572o/4yvNPSD4nI1L8YFTTKDvW	t	2025-12-09 14:21:28.857319+07
+77	1	checkgame2	$2b$10$ua3x7K7r..xk4LSJ3XlyAeb9Im3lOllRD6T8yUNxvmQXEgpdUtf9y	t	2025-12-09 15:55:50.400464+07
 \.
 
 
 --
--- TOC entry 5104 (class 0 OID 0)
--- Dependencies: 232
 -- Name: account_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.account_ledger_id_seq', 80, true);
+SELECT pg_catalog.setval('public.account_ledger_id_seq', 87, true);
 
 
 --
--- TOC entry 5105 (class 0 OID 0)
--- Dependencies: 225
 -- Name: admin_users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -1020,8 +1017,6 @@ SELECT pg_catalog.setval('public.admin_users_id_seq', 1, true);
 
 
 --
--- TOC entry 5106 (class 0 OID 0)
--- Dependencies: 219
 -- Name: partner_sessions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -1029,8 +1024,6 @@ SELECT pg_catalog.setval('public.partner_sessions_id_seq', 25, true);
 
 
 --
--- TOC entry 5107 (class 0 OID 0)
--- Dependencies: 221
 -- Name: partners_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -1038,25 +1031,20 @@ SELECT pg_catalog.setval('public.partners_id_seq', 2, true);
 
 
 --
--- TOC entry 5108 (class 0 OID 0)
--- Dependencies: 230
 -- Name: player_accounts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.player_accounts_id_seq', 3, true);
+SELECT pg_catalog.setval('public.player_accounts_id_seq', 22, true);
 
 
 --
--- TOC entry 5109 (class 0 OID 0)
--- Dependencies: 228
 -- Name: players_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.players_id_seq', 51, true);
+SELECT pg_catalog.setval('public.players_id_seq', 77, true);
 
 
 --
--- TOC entry 4917 (class 2606 OID 16873)
 -- Name: account_ledger account_ledger_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1065,7 +1053,6 @@ ALTER TABLE ONLY public.account_ledger
 
 
 --
--- TOC entry 4901 (class 2606 OID 16746)
 -- Name: admin_users admin_users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1074,7 +1061,6 @@ ALTER TABLE ONLY public.admin_users
 
 
 --
--- TOC entry 4903 (class 2606 OID 16748)
 -- Name: admin_users admin_users_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1083,7 +1069,6 @@ ALTER TABLE ONLY public.admin_users
 
 
 --
--- TOC entry 4893 (class 2606 OID 16685)
 -- Name: games games_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1092,7 +1077,6 @@ ALTER TABLE ONLY public.games
 
 
 --
--- TOC entry 4895 (class 2606 OID 16683)
 -- Name: games games_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1101,7 +1085,6 @@ ALTER TABLE ONLY public.games
 
 
 --
--- TOC entry 4899 (class 2606 OID 16697)
 -- Name: partner_games partner_games_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1110,7 +1093,6 @@ ALTER TABLE ONLY public.partner_games
 
 
 --
--- TOC entry 4887 (class 2606 OID 16427)
 -- Name: partner_sessions partner_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1119,7 +1101,6 @@ ALTER TABLE ONLY public.partner_sessions
 
 
 --
--- TOC entry 4889 (class 2606 OID 16485)
 -- Name: partners partners_api_key_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1128,7 +1109,6 @@ ALTER TABLE ONLY public.partners
 
 
 --
--- TOC entry 4891 (class 2606 OID 16483)
 -- Name: partners partners_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1137,7 +1117,6 @@ ALTER TABLE ONLY public.partners
 
 
 --
--- TOC entry 4913 (class 2606 OID 16843)
 -- Name: player_accounts player_accounts_game_id_partner_id_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1146,7 +1125,6 @@ ALTER TABLE ONLY public.player_accounts
 
 
 --
--- TOC entry 4915 (class 2606 OID 16841)
 -- Name: player_accounts player_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1155,7 +1133,6 @@ ALTER TABLE ONLY public.player_accounts
 
 
 --
--- TOC entry 4906 (class 2606 OID 16824)
 -- Name: players players_partner_id_username_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1164,7 +1141,6 @@ ALTER TABLE ONLY public.players
 
 
 --
--- TOC entry 4908 (class 2606 OID 16822)
 -- Name: players players_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1173,7 +1149,6 @@ ALTER TABLE ONLY public.players
 
 
 --
--- TOC entry 4904 (class 1259 OID 16754)
 -- Name: idx_admin_users_partner_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1181,7 +1156,6 @@ CREATE INDEX idx_admin_users_partner_id ON public.admin_users USING btree (partn
 
 
 --
--- TOC entry 4896 (class 1259 OID 16708)
 -- Name: idx_games_config_gin; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1189,7 +1163,6 @@ CREATE INDEX idx_games_config_gin ON public.games USING gin (config);
 
 
 --
--- TOC entry 4897 (class 1259 OID 16709)
 -- Name: idx_partner_games_config_gin; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1197,7 +1170,6 @@ CREATE INDEX idx_partner_games_config_gin ON public.partner_games USING gin (con
 
 
 --
--- TOC entry 4885 (class 1259 OID 16433)
 -- Name: idx_partner_token; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1205,7 +1177,6 @@ CREATE INDEX idx_partner_token ON public.partner_sessions USING btree (partner_i
 
 
 --
--- TOC entry 4909 (class 1259 OID 16861)
 -- Name: ix_acc_game; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1213,7 +1184,6 @@ CREATE INDEX ix_acc_game ON public.player_accounts USING btree (game_id);
 
 
 --
--- TOC entry 4910 (class 1259 OID 16860)
 -- Name: ix_acc_partner; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1221,7 +1191,6 @@ CREATE INDEX ix_acc_partner ON public.player_accounts USING btree (partner_id);
 
 
 --
--- TOC entry 4911 (class 1259 OID 16859)
 -- Name: ix_acc_player; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1229,7 +1198,6 @@ CREATE INDEX ix_acc_player ON public.player_accounts USING btree (player_id);
 
 
 --
--- TOC entry 4918 (class 1259 OID 16879)
 -- Name: ix_ledger_acc_time; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1237,7 +1205,6 @@ CREATE INDEX ix_ledger_acc_time ON public.account_ledger USING btree (account_id
 
 
 --
--- TOC entry 4919 (class 1259 OID 16880)
 -- Name: ix_ledger_ref; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1245,7 +1212,6 @@ CREATE INDEX ix_ledger_ref ON public.account_ledger USING btree (ref_type, ref_i
 
 
 --
--- TOC entry 4930 (class 2620 OID 16863)
 -- Name: player_accounts trg_acc_partner_match; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1253,7 +1219,6 @@ CREATE TRIGGER trg_acc_partner_match BEFORE INSERT OR UPDATE ON public.player_ac
 
 
 --
--- TOC entry 4929 (class 2620 OID 16776)
 -- Name: admin_users trg_admin_users_set_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1261,7 +1226,6 @@ CREATE TRIGGER trg_admin_users_set_updated_at BEFORE UPDATE ON public.admin_user
 
 
 --
--- TOC entry 4928 (class 2606 OID 16874)
 -- Name: account_ledger account_ledger_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1270,7 +1234,6 @@ ALTER TABLE ONLY public.account_ledger
 
 
 --
--- TOC entry 4922 (class 2606 OID 16749)
 -- Name: admin_users admin_users_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1279,7 +1242,6 @@ ALTER TABLE ONLY public.admin_users
 
 
 --
--- TOC entry 4923 (class 2606 OID 16770)
 -- Name: admin_users fk_admin_users_partner_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1288,7 +1250,6 @@ ALTER TABLE ONLY public.admin_users
 
 
 --
--- TOC entry 4920 (class 2606 OID 16703)
 -- Name: partner_games partner_games_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1297,7 +1258,6 @@ ALTER TABLE ONLY public.partner_games
 
 
 --
--- TOC entry 4921 (class 2606 OID 16698)
 -- Name: partner_games partner_games_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1306,7 +1266,6 @@ ALTER TABLE ONLY public.partner_games
 
 
 --
--- TOC entry 4925 (class 2606 OID 16849)
 -- Name: player_accounts player_accounts_game_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1315,7 +1274,6 @@ ALTER TABLE ONLY public.player_accounts
 
 
 --
--- TOC entry 4926 (class 2606 OID 16854)
 -- Name: player_accounts player_accounts_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1324,7 +1282,6 @@ ALTER TABLE ONLY public.player_accounts
 
 
 --
--- TOC entry 4927 (class 2606 OID 16844)
 -- Name: player_accounts player_accounts_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1333,7 +1290,6 @@ ALTER TABLE ONLY public.player_accounts
 
 
 --
--- TOC entry 4924 (class 2606 OID 16825)
 -- Name: players players_partner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1341,9 +1297,128 @@ ALTER TABLE ONLY public.players
     ADD CONSTRAINT players_partner_id_fkey FOREIGN KEY (partner_id) REFERENCES public.partners(id) ON DELETE CASCADE;
 
 
--- Completed on 2025-11-05 07:20:39
+--
+-- Name: TABLE account_ledger; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.account_ledger TO gameserver;
+
+
+--
+-- Name: SEQUENCE account_ledger_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.account_ledger_id_seq TO gameserver;
+
+
+--
+-- Name: TABLE admin_sessions; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.admin_sessions TO gameserver;
+
+
+--
+-- Name: TABLE admin_users; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.admin_users TO gameserver;
+
+
+--
+-- Name: SEQUENCE admin_users_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.admin_users_id_seq TO gameserver;
+
+
+--
+-- Name: TABLE games; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.games TO gameserver;
+
+
+--
+-- Name: TABLE partner_games; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.partner_games TO gameserver;
+
+
+--
+-- Name: TABLE partner_sessions; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.partner_sessions TO gameserver;
+
+
+--
+-- Name: SEQUENCE partner_sessions_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.partner_sessions_id_seq TO gameserver;
+
+
+--
+-- Name: TABLE partners; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.partners TO gameserver;
+
+
+--
+-- Name: SEQUENCE partners_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.partners_id_seq TO gameserver;
+
+
+--
+-- Name: TABLE player_accounts; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.player_accounts TO gameserver;
+
+
+--
+-- Name: SEQUENCE player_accounts_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.player_accounts_id_seq TO gameserver;
+
+
+--
+-- Name: TABLE players; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.players TO gameserver;
+
+
+--
+-- Name: SEQUENCE players_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.players_id_seq TO gameserver;
+
+
+--
+-- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: postgres
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES  TO gameserver;
+
+
+--
+-- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: postgres
+--
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES  TO gameserver;
+
 
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict GmmKN8mRPORJUcH8f2dF4KFHyg9chbYT27X3jdfemakN7a5vArcwvMFZqH47nXa
 

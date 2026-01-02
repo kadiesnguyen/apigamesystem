@@ -64,7 +64,9 @@ export async function mahjongway2SocketHandler(
                         freeSpinsLeft: result.freeSpinsLeft,
                         usingFreeSpin: result.usingFreeSpin,
                         free: result.free,
-                        rounds: result.rounds
+                        rounds: result.rounds,
+                        // Thông tin cấu trúc grid để client biết số hàng mỗi cột
+                        gridConfig: result.gridConfig,
                     };
 
                     ws.send(JSON.stringify({

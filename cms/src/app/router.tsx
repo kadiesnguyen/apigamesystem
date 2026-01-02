@@ -20,7 +20,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
 
-          { path: "/dashboard", element: <Dashboard /> },
+          { path: "dashboard", element: <Dashboard /> },
 
           { path: "/games/list", element: <GamesList /> },
           { path: "/games/new", element: <GameCreate /> },

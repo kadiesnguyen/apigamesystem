@@ -10,19 +10,13 @@ const GAME_PRESETS = [
     key: 'mahjongway1',
     label: 'MahjongWay 1',
     gameId: '1003',
-    portalUrl: 'http://mahjongway.68gameplay.com/play/'
+    portalUrl: 'http://mahjongway.web3oktrade.com/game/'
   },
   {
     key: 'mahjongway2',
     label: 'MahjongWay 2',
     gameId: '1002',
-    portalUrl: 'http://mahjongway2.68gameplay.com/play/'
-  },
-  {
-    key: 'superace',
-    label: 'Super Ace',
-    gameId: '1001',
-    portalUrl: 'https://superace.68gameplay.shop/play/'
+    portalUrl: 'http://mahjongway2.web3oktrade.com/game/'
   }
 ] as const
 
@@ -92,13 +86,13 @@ type LoginApiResponse = { success: true; data: LoginPayload }
 type LoginApiError = { success: false; error?: string }
 
 const defaultSettings: Settings = {
-  apiBaseUrl: 'https://api.68gameplay.shop/api',
-  wsBaseUrl: 'wss://wss.68gameplay.shop',
-  apiKey: 'partner_abc',
-  secretKey: '74286262f408',
+  apiBaseUrl: 'https://api.web3oktrade.com/api',
+  wsBaseUrl: 'wss://wss.web3oktrade.com',
+  apiKey: '',
+  secretKey: '',
   username: '',
   betAmount: '1',
-  debugApiUrl: 'https://apicms.68gameplay.shop'
+  debugApiUrl: 'https://apicms.web3oktrade.com'
 }
 
 const loadSettings = (gameKey: GameKey): Settings => {
@@ -509,25 +503,6 @@ function App() {
       setLoginPayload(data.data)
       setToken(data.data.token)
       pushLog('✅ Đăng nhập thành công', 'info')
-      
-      // Tự động mở tab mới vào game khi đăng nhập thành công
-      if (data.data.token) {
-        try {
-          const portalUrl = new URL(currentGame.portalUrl)
-          portalUrl.searchParams.set('token', data.data.token)
-          portalUrl.searchParams.set('gameID', currentGame.gameId)
-          const finalUrl = portalUrl.toString()
-          setLastGameUrl(finalUrl)
-          const popup = window.open(finalUrl, '_blank', 'noopener,noreferrer')
-          if (!popup) {
-            pushLog('⚠️ Trình duyệt chặn mở tab mới. Vui lòng cho phép popup hoặc bấm nút "Vào game"', 'error')
-          } else {
-            pushLog(`🎮 Tự động mở game ${currentGame.label}: ${finalUrl}`, 'info')
-          }
-        } catch {
-          pushLog('Game portal URL không hợp lệ', 'error')
-        }
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Đăng nhập thất bại'
       pushLog(`❌ ${message}`, 'error')
@@ -904,7 +879,7 @@ function App() {
             <input
               value={settings.apiBaseUrl}
               onChange={(e) => updateSetting('apiBaseUrl')(e.target.value)}
-              placeholder="https://api.68gameplay.shop/api"
+              placeholder="https://api.web3oktrade.com/api"
             />
           </label>
           <label>
@@ -912,7 +887,7 @@ function App() {
             <input
               value={settings.wsBaseUrl}
               onChange={(e) => updateSetting('wsBaseUrl')(e.target.value)}
-              placeholder="wss://wss.68gameplay.shop"
+              placeholder="wss://wss.web3oktrade.com"
             />
           </label>
           <label>
@@ -1154,7 +1129,7 @@ function App() {
             <input
               value={settings.debugApiUrl}
               onChange={(e) => updateSetting('debugApiUrl')(e.target.value)}
-              placeholder="https://apicms.68gameplay.shop"
+              placeholder="https://apicms.web3oktrade.com"
             />
           </label>
           <label>
