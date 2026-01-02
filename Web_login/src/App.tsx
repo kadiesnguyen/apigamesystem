@@ -502,7 +502,9 @@ function App() {
 
       setLoginPayload(data.data)
       setToken(data.data.token)
-      pushLog('✅ Đăng nhập thành công', 'info')
+      pushLog('✅ Đăng nhập thành công, đang vào game...', 'info')
+      // Tự động vào game sau khi đăng nhập thành công
+      launchGame(data.data.token)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Đăng nhập thất bại'
       pushLog(`❌ ${message}`, 'error')
@@ -803,24 +805,21 @@ function App() {
     }
   }
 
-    const launchGame = () => {
-    if (!token) {
+  const launchGame = (gameToken?: string) => {
+    const tokenToUse = gameToken || token
+    if (!tokenToUse) {
       pushLog('Cần đăng nhập để lấy token trước khi vào game', 'error')
       return
     }
     try {
       const portalUrl = new URL(currentGame.portalUrl)
-      portalUrl.searchParams.set('token', token)
+      portalUrl.searchParams.set('token', tokenToUse)
       portalUrl.searchParams.set('gameID', currentGame.gameId)
       const finalUrl = portalUrl.toString()
       setLastGameUrl(finalUrl)
-      const popup = window.open(finalUrl, '_blank', 'noopener,noreferrer')
-      if (!popup) {
-        pushLog('Trình duyệt chặn mở tab mới, chuyển trực tiếp sang game...', 'error')
-        window.location.href = finalUrl
-        return
-      }
-      pushLog(`🎮 Mở game: ${finalUrl}`, 'info')
+      pushLog(`🎮 Đang chuyển sang game: ${finalUrl}`, 'info')
+      // Mở game trong trang hiện tại thay vì tab mới
+      window.location.href = finalUrl
     } catch {
       pushLog('Game portal URL không hợp lệ', 'error')
     }
@@ -942,18 +941,7 @@ function App() {
               <button type="button" onClick={copyToken} disabled={!token}>
                 Copy
               </button>
-                <button type="button" onClick={launchGame} disabled={!token}>
-                  Vào game
-                </button>
             </div>
-            {lastGameUrl && (
-              <p className="muted">
-                Nếu tab không tự mở,{' '}
-                <a href={lastGameUrl} target="_blank" rel="noopener noreferrer">
-                  bấm vào đây
-                </a>.
-              </p>
-            )}
           </label>
 
           <div className="actions dual">
@@ -1009,9 +997,6 @@ function App() {
                 <strong>Thông tin người chơi</strong>
                 <small>Dựa trên phản hồi đăng nhập</small>
               </div>
-              <button type="button" onClick={launchGame} disabled={!token}>
-                Vào game
-              </button>
             </div>
             <div className="stat-grid small">
               <div className="stat-card compact">
