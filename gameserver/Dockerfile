@@ -11,10 +11,6 @@ FROM oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
 
-# Fix Kaniko permission issues with executables
-RUN chmod +x /usr/local/bin/bun || true && \
-    find /usr/local/bin -type f -exec chmod +x {} \; || true
-
 # Copy package files
 COPY package.json bun.lock* ./
 
@@ -24,8 +20,8 @@ RUN bun install --frozen-lockfile --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build the application
-RUN bun build src/index.ts --outdir dist --target bun
+# Build the application (exclude native modules from bundling)
+RUN bun build src/index.ts --outdir dist --target bun --external bcrypt
 
 # ============================================
 # Stage 2: Production stage
@@ -34,8 +30,9 @@ FROM oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
-# Copy built artifacts from builder stage (no node_modules needed - code is bundled)
+# Copy built artifacts and node_modules from builder stage (needed for native modules like bcrypt)
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
 # Create non-root user for security
