@@ -40,6 +40,13 @@ export const setupApp = async (): Promise<SetupResult> => {
   app.use(cors({ origin: '*' }));
   app.use(loggerMiddleware);
 
+  // Health check endpoint
+  app.get('/health', () => ({
+    status: 'ok',
+    service: 'gameserver',
+    timestamp: new Date().toISOString()
+  }));
+
   app.group('/api', (g) => {
     authMiddleware(g);
     UserRoutes(g);
