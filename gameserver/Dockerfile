@@ -34,9 +34,8 @@ FROM oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
-# Copy built artifacts from builder stage
+# Copy built artifacts from builder stage (no node_modules needed - code is bundled)
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
 # Create non-root user for security
