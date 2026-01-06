@@ -7,6 +7,9 @@
 # Stage 1: Build stage
 FROM oven/bun:1.2-alpine AS builder
 
+# Ensure bun is executable
+RUN chmod +x /usr/local/bin/bun
+
 WORKDIR /app
 
 # Copy package files
