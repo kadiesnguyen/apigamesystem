@@ -13,6 +13,9 @@ const pool = new Pool({
   // postgres://postgres:A1234@localhost:5432/game';
   // connectionString: `postgres://${user}:${password}@${host}:${port}/${database}`,
   connectionString: `postgres://${user}:${password}@${host}:${port}/${database}`,
+  ssl: {
+    rejectUnauthorized: false // Required for AWS RDS
+  }
 });
 
 let isConnected = false;
