@@ -20,8 +20,8 @@ RUN bun install --frozen-lockfile --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build the application (exclude native modules from bundling)
-RUN bun build src/index.ts --outdir dist --target bun
+# Build the application (exclude native modules and problematic dependencies from bundling)
+RUN bun build src/index.ts --outdir dist --target bun --external bcrypt --external ioredis --external mongodb --sourcemap=external
 
 # ============================================
 # Stage 2: Production stage
