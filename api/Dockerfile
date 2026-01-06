@@ -28,14 +28,15 @@ FROM oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
+# Copy built artifacts from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S apiserver -u 1001 -G nodejs
-
-# Copy built artifacts from builder stage
-COPY --from=builder --chown=apiserver:nodejs /app/dist ./dist
-COPY --from=builder --chown=apiserver:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=apiserver:nodejs /app/package.json ./
+    adduser -S apiserver -u 1001 -G nodejs && \
+    chown -R apiserver:nodejs /app
 
 # Set environment variables
 ENV NODE_ENV=production

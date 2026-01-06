@@ -48,7 +48,6 @@ docs/
 # Docker files (avoid recursive copying)
 Dockerfile
 docker-compose*.yml
-.dockerignore
 
 # Development files
 *.sql

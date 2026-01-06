@@ -11,11 +11,15 @@ FROM oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
 
+# Fix Kaniko permission issues with executables
+RUN chmod +x /usr/local/bin/bun || true && \
+    find /usr/local/bin -type f -exec chmod +x {} \; || true
+
 # Copy package files
 COPY package.json bun.lock* ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install dependencies (skip scripts to avoid permission issues with native modules)
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -30,14 +34,15 @@ FROM oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
+# Copy built artifacts from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S gameserver -u 1001 -G nodejs
-
-# Copy built artifacts from builder stage
-COPY --from=builder --chown=gameserver:nodejs /app/dist ./dist
-COPY --from=builder --chown=gameserver:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=gameserver:nodejs /app/package.json ./
+    adduser -S gameserver -u 1001 -G nodejs && \
+    chown -R gameserver:nodejs /app
 
 # Set environment variables
 ENV NODE_ENV=production
