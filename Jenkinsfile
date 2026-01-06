@@ -3,29 +3,28 @@
 @Library('shared-pipeline-library') _
 
 pipeline {
-    agent {
-        kubernetes {
-            label 'nodejs'
-            defaultContainer 'node'
-        }
-    }
+    agent none  // No default agent - each stage gets its own
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timestamps()
         ansiColor('xterm')
-        disableConcurrentBuilds()
         timeout(time: 1, unit: 'HOURS')
     }
     
     environment {
         AWS_REGION = 'ap-southeast-1'
         AWS_ACCOUNT_ID = '185003592665'
-        IMAGE_TAG = "${env.GIT_COMMIT?.take(7) ?: 'latest'}-${env.BUILD_NUMBER}"
     }
     
     stages {
-        stage('Checkout') {
+        stage('Prepare') {
+            agent {
+                kubernetes {
+                    label 'nodejs-prepare'
+                    defaultContainer 'node'
+                }
+            }
             steps {
                 echo '📥 Checking out source code...'
                 checkout scm
@@ -46,6 +45,9 @@ pipeline {
                         script: "git log -1 --pretty=format:'%s'",
                         returnStdout: true
                     ).trim()
+                    
+                    // Set IMAGE_TAG with git commit hash
+                    env.IMAGE_TAG = "${env.GIT_COMMIT_SHORT}-${env.BUILD_NUMBER}"
                 }
                 
                 echo """
@@ -64,7 +66,14 @@ pipeline {
         stage('Build Services') {
             parallel {
                 stage('Build API') {
+                    agent {
+                        kubernetes {
+                            label 'nodejs-api'
+                            defaultContainer 'node'
+                        }
+                    }
                     steps {
+                        checkout scm
                         script {
                             echo '🔨 Building API service...'
                             
@@ -79,12 +88,31 @@ pipeline {
                             
                             env.API_IMAGE = apiImage.fullImageName
                             echo "✅ API built: ${env.API_IMAGE}"
+                            
+                            // Update ArgoCD manifest immediately after build
+                            echo '📝 Updating API ArgoCD manifest...'
+                            updateArgoCDManifests(
+                                repoUrl: 'git@github.com:apigame-devops/application-microservices.git',
+                                credentialsId: 'github-ssh-credentials',
+                                environment: 'staging',
+                                serviceName: 'api',
+                                imageTag: env.IMAGE_TAG,
+                                workDir: 'gitops-repo-api'
+                            )
+                            echo "✅ API manifest updated"
                         }
                     }
                 }
                 
                 stage('Build CMS') {
+                    agent {
+                        kubernetes {
+                            label 'nodejs-cms'
+                            defaultContainer 'node'
+                        }
+                    }
                     steps {
+                        checkout scm
                         script {
                             echo '🔨 Building CMS service...'
                             
@@ -99,12 +127,31 @@ pipeline {
                             
                             env.CMS_IMAGE = cmsImage.fullImageName
                             echo "✅ CMS built: ${env.CMS_IMAGE}"
+                            
+                            // Update ArgoCD manifest immediately after build
+                            echo '📝 Updating CMS ArgoCD manifest...'
+                            updateArgoCDManifests(
+                                repoUrl: 'git@github.com:apigame-devops/application-microservices.git',
+                                credentialsId: 'github-ssh-credentials',
+                                environment: 'staging',
+                                serviceName: 'cms',
+                                imageTag: env.IMAGE_TAG,
+                                workDir: 'gitops-repo-cms'
+                            )
+                            echo "✅ CMS manifest updated"
                         }
                     }
                 }
                 
                 stage('Build Server') {
+                    agent {
+                        kubernetes {
+                            label 'nodejs-server'
+                            defaultContainer 'node'
+                        }
+                    }
                     steps {
+                        checkout scm
                         script {
                             echo '🔨 Building Server service...'
                             
@@ -119,25 +166,20 @@ pipeline {
                             
                             env.SERVER_IMAGE = serverImage.fullImageName
                             echo "✅ Server built: ${env.SERVER_IMAGE}"
+                            
+                            // Update ArgoCD manifest immediately after build
+                            echo '📝 Updating Server ArgoCD manifest...'
+                            updateArgoCDManifests(
+                                repoUrl: 'git@github.com:apigame-devops/application-microservices.git',
+                                credentialsId: 'github-ssh-credentials',
+                                environment: 'staging',
+                                serviceName: 'server',
+                                imageTag: env.IMAGE_TAG,
+                                workDir: 'gitops-repo-server'
+                            )
+                            echo "✅ Server manifest updated"
                         }
                     }
-                }
-            }
-        }
-        
-        stage('Update ArgoCD Manifests') {
-            steps {
-                script {
-                    updateArgoCDManifests(
-                        repoUrl: 'git@github.com:apigame-devops/application-microservices.git',
-                        credentialsId: 'github-ssh-credentials',
-                        environment: 'staging',
-                        services: [
-                            [name: 'api', imageTag: env.IMAGE_TAG],
-                            [name: 'cms', imageTag: env.IMAGE_TAG],
-                            [name: 'server', imageTag: env.IMAGE_TAG]
-                        ]
-                    )
                 }
             }
         }
@@ -186,18 +228,8 @@ pipeline {
         
         always {
             script {
-                echo '🧹 Cleaning up...'
-                
-                // Clean workspace
-                cleanWs(
-                    deleteDirs: true,
-                    patterns: [
-                        [pattern: 'node_modules', type: 'INCLUDE'],
-                        [pattern: '.bun', type: 'INCLUDE'],
-                        [pattern: 'dist', type: 'INCLUDE'],
-                        [pattern: 'build', type: 'INCLUDE']
-                    ]
-                )
+                echo '✅ Pipeline completed'
+                echo 'Note: Individual agent pods are automatically cleaned up by Kubernetes'
             }
         }
     }
