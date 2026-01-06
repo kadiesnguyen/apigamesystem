@@ -5,7 +5,7 @@
 # ============================================
 
 # Stage 1: Build stage
-FROM oven/bun:1.2-alpine AS builder
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS builder
 
 # Ensure bun is executable
 RUN chmod +x /usr/local/bin/bun
@@ -27,7 +27,7 @@ RUN bun build src/server.ts --outdir dist --target bun
 # ============================================
 # Stage 2: Production stage
 # ============================================
-FROM oven/bun:1.2-alpine AS production
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 

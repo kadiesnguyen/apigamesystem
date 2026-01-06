@@ -7,7 +7,7 @@
 # ============================================
 
 # Stage 1: Build stage
-FROM oven/bun:1.2-alpine AS builder
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
 
@@ -21,12 +21,12 @@ RUN bun install --frozen-lockfile --ignore-scripts
 COPY . .
 
 # Build the application (exclude native modules from bundling)
-RUN bun build src/index.ts --outdir dist --target bun --external bcrypt
+RUN bun build src/index.ts --outdir dist --target bun
 
 # ============================================
 # Stage 2: Production stage
 # ============================================
-FROM oven/bun:1.2-alpine AS production
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
