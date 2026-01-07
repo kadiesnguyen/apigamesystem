@@ -72,6 +72,9 @@ const app = new Elysia()
         return ctx.json({ accessToken: access });
     });
 
+// Health check endpoint
+app.get('/health', () => ({ status: 'ok', service: 'api' }));
+
 /** Auth guard */
 const authGuard = (handler: any) => (ctx: any) => {
     const hdr = ctx.request.headers.get('authorization') || '';

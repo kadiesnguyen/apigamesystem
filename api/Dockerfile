@@ -5,7 +5,10 @@
 # ============================================
 
 # Stage 1: Build stage
-FROM oven/bun:1.2-alpine AS builder
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS builder
+
+# Ensure bun is executable
+RUN chmod +x /usr/local/bin/bun
 
 WORKDIR /app
 
@@ -24,18 +27,18 @@ RUN bun build src/server.ts --outdir dist --target bun
 # ============================================
 # Stage 2: Production stage
 # ============================================
-FROM oven/bun:1.2-alpine AS production
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
+# Copy built artifacts from builder stage (no node_modules needed - code is bundled)
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S apiserver -u 1001 -G nodejs
-
-# Copy built artifacts from builder stage
-COPY --from=builder --chown=apiserver:nodejs /app/dist ./dist
-COPY --from=builder --chown=apiserver:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=apiserver:nodejs /app/package.json ./
+    adduser -S apiserver -u 1001 -G nodejs && \
+    chown -R apiserver:nodejs /app
 
 # Set environment variables
 ENV NODE_ENV=production

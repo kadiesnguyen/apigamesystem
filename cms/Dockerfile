@@ -8,7 +8,7 @@
 # ============================================
 
 # Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/ecr-public/docker/library/node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -34,7 +34,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Production stage with Nginx
 # ============================================
-FROM nginx:alpine AS production
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/ecr-public/docker/library/nginx:alpine AS production
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { Db, Collection } from 'mongodb';
 import { GridModel, type StepRoundPayload, type CopyEvent } from './gridmodel';
 import { MahjongWay2Config } from './config';
-import { UserBalanceService } from '../../services/UserBalanceService';d
+import { UserBalanceService } from '../../services/UserBalanceService';
 import { ConfigManager } from '../../../config/ConfigManager';
 import type { MahjongWay2Runtime } from './adapter';
 import {

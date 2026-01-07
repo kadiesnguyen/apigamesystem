@@ -7,37 +7,38 @@
 # ============================================
 
 # Stage 1: Build stage
-FROM oven/bun:1.2-alpine AS builder
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json bun.lock* ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install dependencies (skip scripts to avoid permission issues with native modules)
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN bun build src/index.ts --outdir dist --target bun
+# Build the application (exclude native modules and problematic dependencies from bundling)
+RUN bun build src/index.ts --outdir dist --target bun --external bcrypt --external ioredis --external mongodb --sourcemap=external
 
 # ============================================
 # Stage 2: Production stage
 # ============================================
-FROM oven/bun:1.2-alpine AS production
+FROM 185003592665.dkr.ecr.ap-southeast-1.amazonaws.com/docker-hub/oven/bun:1.2-alpine AS production
 
 WORKDIR /app
 
+# Copy built artifacts and node_modules from builder stage (needed for native modules like bcrypt)
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S gameserver -u 1001 -G nodejs
-
-# Copy built artifacts from builder stage
-COPY --from=builder --chown=gameserver:nodejs /app/dist ./dist
-COPY --from=builder --chown=gameserver:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=gameserver:nodejs /app/package.json ./
+    adduser -S gameserver -u 1001 -G nodejs && \
+    chown -R gameserver:nodejs /app
 
 # Set environment variables
 ENV NODE_ENV=production
